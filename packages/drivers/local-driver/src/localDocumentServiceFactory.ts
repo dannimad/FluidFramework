@@ -27,7 +27,7 @@ import { LocalDocumentDeltaConnection } from "./localDocumentDeltaConnection";
 import { createLocalDocumentService } from "./localDocumentService";
 
 export class createStorageDocumentClass {
-	private static instance: createStorageDocumentClass;
+	private static instance: createStorageDocumentClass | undefined;
 
 	private constructor(
 		private readonly localDeltaConnectionServer?: ILocalDeltaConnectionServer,
@@ -36,20 +36,22 @@ export class createStorageDocumentClass {
 		private readonly resolvedUrl?: any,
 	) {}
 
-	public static getClass(
+	public static getInstance() {
+		return createStorageDocumentClass.instance;
+	}
+
+	public static createInstance(
 		localDeltaConnectionServer?: ILocalDeltaConnectionServer,
 		tenantId?,
 		id?,
 		resolvedUrl?,
 	) {
-		if (!createStorageDocumentClass.instance) {
-			createStorageDocumentClass.instance = new createStorageDocumentClass(
-				localDeltaConnectionServer,
-				tenantId,
-				id,
-				resolvedUrl,
-			);
-		}
+		createStorageDocumentClass.instance = new createStorageDocumentClass(
+			localDeltaConnectionServer,
+			tenantId,
+			id,
+			resolvedUrl,
+		);
 		return createStorageDocumentClass.instance;
 	}
 
@@ -77,6 +79,7 @@ export class createStorageDocumentClass {
 			quorumValues,
 			false /* enableDiscovery */,
 		);
+		createStorageDocumentClass.instance = undefined;
 	}
 }
 
@@ -145,7 +148,7 @@ export class LocalDocumentServiceFactory implements IDocumentServiceFactory {
 		if (!this.localDeltaConnectionServer) {
 			throw new Error("Provide the localDeltaConnectionServer!!");
 		}
-		const createLocalDocumentClass = createStorageDocumentClass.getClass(
+		const createLocalDocumentClass = createStorageDocumentClass.createInstance(
 			this.localDeltaConnectionServer,
 			tenantId,
 			id,

@@ -336,6 +336,7 @@ declare function get_old_ClassDeclaration_OdspTestDriver():
 declare function use_current_ClassDeclaration_OdspTestDriver(
     use: TypeOnly<current.OdspTestDriver>);
 use_current_ClassDeclaration_OdspTestDriver(
+    // @ts-expect-error compatibility expected to be broken
     get_old_ClassDeclaration_OdspTestDriver());
 
 /*
@@ -348,6 +349,7 @@ declare function get_current_ClassDeclaration_OdspTestDriver():
 declare function use_old_ClassDeclaration_OdspTestDriver(
     use: TypeOnly<old.OdspTestDriver>);
 use_old_ClassDeclaration_OdspTestDriver(
+    // @ts-expect-error compatibility expected to be broken
     get_current_ClassDeclaration_OdspTestDriver());
 
 /*

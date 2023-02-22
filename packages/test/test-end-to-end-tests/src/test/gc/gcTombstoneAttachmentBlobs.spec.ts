@@ -20,7 +20,7 @@ import { describeNoCompat, ITestDataObject, itExpects } from "@fluidframework/te
 import { delay, stringToBuffer } from "@fluidframework/common-utils";
 import { IContainer, LoaderHeader } from "@fluidframework/container-definitions";
 import { IOdspResolvedUrl } from "@fluidframework/odsp-driver-definitions";
-import { getUrlFromItemId, MockDetachedBlobStorage } from "../mockDetachedBlobStorage";
+import { getUrlFromDetachedBlobStorage, MockDetachedBlobStorage } from "../mockDetachedBlobStorage";
 
 /**
  * These tests validate that SweepReady attachment blobs are correctly marked as tombstones. Tombstones should be added
@@ -496,7 +496,7 @@ describeNoCompat("GC attachment blob tombstone tests", (getTestObjectProvider) =
 				const summary2 = await summarizeNow(summarizer);
 
 				// Load a new container from the above summary which should have the blob tombstoned.
-				const url = getUrlFromItemId(
+				const url = getUrlFromDetachedBlobStorage(
 					(mainContainer.resolvedUrl as IOdspResolvedUrl).itemId,
 					provider,
 				);
@@ -584,7 +584,7 @@ describeNoCompat("GC attachment blob tombstone tests", (getTestObjectProvider) =
 				const summary2 = await summarizeNow(summarizer);
 
 				// Load a new container from the above summary which should have the blob tombstoned.
-				const url = getUrlFromItemId(
+				const url = getUrlFromDetachedBlobStorage(
 					(mainContainer.resolvedUrl as IOdspResolvedUrl).itemId,
 					provider,
 				);
@@ -699,7 +699,7 @@ describeNoCompat("GC attachment blob tombstone tests", (getTestObjectProvider) =
 				const summary2 = await summarizeNow(summarizer);
 
 				// Load a new container from the above summary which should have the blobs tombstoned.
-				const url = getUrlFromItemId(
+				const url = getUrlFromDetachedBlobStorage(
 					(mainContainer.resolvedUrl as IOdspResolvedUrl).itemId,
 					provider,
 				);

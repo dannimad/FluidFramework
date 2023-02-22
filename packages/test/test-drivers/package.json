@@ -109,6 +109,10 @@
 			},
 			"ClassDeclaration_TinyliciousTestDriver": {
 				"forwardCompat": false
+			},
+			"ClassDeclaration_OdspTestDriver": {
+				"forwardCompat": false,
+				"backCompat": false
 			}
 		}
 	}

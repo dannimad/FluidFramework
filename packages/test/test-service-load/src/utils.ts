@@ -233,7 +233,9 @@ export async function initialize(
 	container.close();
 
 	if ((testConfig.detachedBlobCount ?? 0) > 0 && testDriver.type === "odsp") {
-		const url = (testDriver as OdspTestDriver).getUrlFromItemId((resolvedUrl as any).itemId);
+		const url = (testDriver as OdspTestDriver).getUrlFromDetachedBlobStorage(
+			(resolvedUrl as any).itemId,
+		);
 		return url;
 	}
 	return testDriver.createContainerUrl(testId, resolvedUrl);

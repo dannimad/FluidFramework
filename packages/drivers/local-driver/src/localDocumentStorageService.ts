@@ -83,8 +83,10 @@ export class LocalDocumentStorageService implements IDocumentStorageService {
 		summary: ISummaryTree,
 		context: ISummaryContext,
 	): Promise<string> {
-		const c = createStorageDocumentClass.getClass();
-		await c.createDocument(summary);
+		const c = createStorageDocumentClass.getInstance();
+		if (c) {
+			await c.createDocument(summary);
+		}
 		return this.summaryTreeUploadManager.writeSummaryTree(
 			summary,
 			context.ackHandle ?? "",

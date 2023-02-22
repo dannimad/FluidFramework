@@ -375,7 +375,7 @@ export class OdspTestDriver implements ITestDriver {
 		return tokens.accessToken;
 	}
 
-	public getUrlFromItemId(itemId: string) {
+	public getUrlFromDetachedBlobStorage(itemId: string) {
 		return this.api.createOdspUrl({
 			siteUrl: this.config.siteUrl,
 			driveId: this.config.driveId,

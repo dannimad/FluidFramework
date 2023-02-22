@@ -19,7 +19,7 @@ import {
 import { describeNoCompat, ITestDataObject } from "@fluidframework/test-version-utils";
 // eslint-disable-next-line import/no-internal-modules
 import { BlobManager } from "@fluidframework/container-runtime/dist/blobManager";
-import { getUrlFromItemId, MockDetachedBlobStorage } from "../mockDetachedBlobStorage";
+import { getUrlFromDetachedBlobStorage, MockDetachedBlobStorage } from "../mockDetachedBlobStorage";
 import { getGCStateFromSummary } from "./gcTestSummaryUtils";
 
 const waitForContainerConnectionWriteMode = async (container: Container) => {
@@ -117,7 +117,7 @@ describeNoCompat("Garbage collection of blobs", (getTestObjectProvider) => {
 		 * blobs when createContainerUrl() is called, instead creating a new file.
 		 */
 		async function loadContainer() {
-			const url = getUrlFromItemId(
+			const url = getUrlFromDetachedBlobStorage(
 				(container.resolvedUrl as IOdspResolvedUrl).itemId,
 				provider,
 			);

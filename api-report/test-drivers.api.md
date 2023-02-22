@@ -128,7 +128,7 @@ export class OdspTestDriver implements ITestDriver {
     // (undocumented)
     readonly endpointName?: string | undefined;
     // (undocumented)
-    getUrlFromItemId(itemId: string): string;
+    getUrlFromDetachedBlobStorage(itemId: string): string;
     // (undocumented)
     readonly tenantName?: string | undefined;
     // (undocumented)
