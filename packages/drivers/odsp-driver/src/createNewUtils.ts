@@ -184,7 +184,7 @@ function convertSummaryToSnapshotTreeForCreateNew(summary: ISummaryTree): IOdspS
 }
 
 export async function createNewFluidContainerCore<T>(args: {
-	containerSnapshot: IOdspSummaryPayload;
+	containerSnapshot: IOdspSummaryPayload | undefined;
 	getStorageToken: InstrumentedStorageTokenFetcher;
 	logger: ITelemetryLogger;
 	initialUrl: string;
