@@ -255,13 +255,20 @@ export async function createNewFluidFileContent(
 	epochTracker: EpochTracker,
 	forceAccessTokenViaAuthorizationHeader: boolean,
 ): Promise<ICreateFileResponse> {
+	let containerSnapshot: IOdspSummaryPayload | undefined;
+	let encodedFilename: string;
 	const filePath = newFileInfo.filePath ? encodeURIComponent(`/${newFileInfo.filePath}`) : "";
-	const encodedFilename = encodeURIComponent(newFileInfo.filename);
+	if (createNewSummary !== undefined) {
+		containerSnapshot = convertSummaryIntoContainerSnapshot(createNewSummary);
+		encodedFilename = encodeURIComponent(newFileInfo.filename);
+	} else {
+		encodedFilename = encodeURIComponent(`${newFileInfo.filename}.tmp`);
+	}
+
 	const baseUrl =
 		`${getApiRoot(getOrigin(newFileInfo.siteUrl))}/drives/${newFileInfo.driveId}/items/root:` +
 		`${filePath}/${encodedFilename}`;
 
-	let containerSnapshot: IOdspSummaryPayload | undefined;
 	if (createNewSummary !== undefined) {
 		containerSnapshot = convertSummaryIntoContainerSnapshot(createNewSummary);
 	}

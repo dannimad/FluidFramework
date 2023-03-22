@@ -68,6 +68,7 @@ describeFullCompat("blobs", (getTestObjectProvider) => {
 		if (provider.driver.type === "routerlicious" && provider.driver.endpointName === "frs") {
 			this.skip();
 		}
+		console.log("COMPILE SU");
 	});
 
 	it("attach sends an op", async function () {

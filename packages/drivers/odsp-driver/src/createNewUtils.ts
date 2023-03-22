@@ -216,7 +216,7 @@ export async function createNewFluidContainerCore<T>(args: {
 			logger,
 			{ eventName: telemetryName },
 			async (event) => {
-				const snapshotBody = JSON.stringify(containerSnapshot);
+				const snapshotBody = containerSnapshot ? JSON.stringify(containerSnapshot) : "";
 				let url: string;
 				let headers: { [index: string]: string };
 				let addInBody = false;
@@ -250,6 +250,7 @@ export async function createNewFluidContainerCore<T>(args: {
 					};
 					postBody = snapshotBody;
 				}
+				console.log(postBody);
 
 				const fetchResponse = await runWithRetry(
 					async () =>

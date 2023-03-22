@@ -826,7 +826,7 @@ describe("Runtime", () => {
 				};
 				assert.throws(
 					codeBlock,
-					(e) =>
+					(e: any) =>
 						e.errorType === ContainerErrorType.usageError &&
 						e.message === `Id cannot contain slashes: '${invalidId}'`,
 				);
