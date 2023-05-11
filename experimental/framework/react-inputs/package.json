@@ -36,6 +36,7 @@
 		"@fluidframework/cell": "workspace:~",
 		"@fluidframework/common-definitions": "^0.20.1",
 		"@fluidframework/common-utils": "^1.1.1",
+		"@fluidframework/core-interfaces": "workspace:2.0.0-internal.4.3.0",
 		"@fluidframework/map": "workspace:2.0.0-internal.4.3.0",
 		"@fluidframework/merge-tree": "workspace:~",
 		"@fluidframework/sequence": "workspace:~",

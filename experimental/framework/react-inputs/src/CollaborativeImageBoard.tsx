@@ -5,12 +5,24 @@
 
 import React, { useEffect, useState } from "react";
 import { SharedMap } from "@fluidframework/map";
+import { IFluidHandle } from "@fluidframework/core-interfaces";
 
 export interface ICollaborativeImageBoardProps {
 	/**
 	 * The SharedString that will store the text from the textarea.
 	 */
 	map: SharedMap;
+
+	uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
+}
+
+async function getImageArrayBuffer(url: string): Promise<ArrayBuffer> {
+	const response = await fetch(url);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+	}
+	const arrayBuffer = await response.arrayBuffer();
+	return arrayBuffer;
 }
 
 export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = (
@@ -20,12 +32,14 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 
 	const [mapValues, setMapValues] = useState<string[]>([]);
 
-	const handleClick = () => {
+	const handleClick = async () => {
 		// setText(map);
 		const randomKey = Math.floor(Math.random() * 100);
 		const randomValue = `https://picsum.photos/id/${randomKey}/200/300`;
+		const imagebuffer = await getImageArrayBuffer(randomValue);
+		const handle = await props.uploadBlob(imagebuffer);
+		console.log(handle);
 		map.set(randomKey.toString(), randomValue.toString());
-		// Your code here
 	};
 
 	useEffect(() => {

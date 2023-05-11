@@ -5668,6 +5668,7 @@ importers:
       '@fluidframework/cell': workspace:~
       '@fluidframework/common-definitions': ^0.20.1
       '@fluidframework/common-utils': ^1.1.1
+      '@fluidframework/core-interfaces': workspace:2.0.0-internal.4.3.0
       '@fluidframework/eslint-config-fluid': ^2.0.0
       '@fluidframework/map': workspace:2.0.0-internal.4.3.0
       '@fluidframework/merge-tree': workspace:~
@@ -5687,6 +5688,7 @@ importers:
       '@fluidframework/cell': link:../../../packages/dds/cell
       '@fluidframework/common-definitions': 0.20.1
       '@fluidframework/common-utils': 1.1.1
+      '@fluidframework/core-interfaces': link:../../../packages/common/core-interfaces
       '@fluidframework/map': link:../../../packages/dds/map
       '@fluidframework/merge-tree': link:../../../packages/dds/merge-tree
       '@fluidframework/sequence': link:../../../packages/dds/sequence

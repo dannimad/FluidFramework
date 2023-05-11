@@ -14,7 +14,7 @@ import { ImageBoardObjectView } from "./view";
  * This is a helper function for loading the page. It's required because getting the Fluid Container
  * requires making async calls.
  */
-async function start() {
+async function start(this: any) {
 	const tinyliciousModelLoader = new TinyliciousModelLoader<IImageBoardObjectAppModel>(
 		new StaticCodeLoader(new ImageBoardObjectContainerRuntimeFactory()),
 	);
@@ -44,6 +44,7 @@ async function start() {
 		ReactDOM.render(
 			React.createElement(ImageBoardObjectView, {
 				map: model.imageBoardObject.map,
+				uploadBlob: model.imageBoardObject.uploadBlob.bind(model.imageBoardObject),
 			}),
 			contentDiv,
 		);

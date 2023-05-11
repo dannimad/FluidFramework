@@ -32,12 +32,9 @@ export class ImageBoardObject extends DataObject {
 		{},
 	);
 
-	// public async uploadImage() {
-	// 	const blob = await this.runtime.uploadBlob(
-	// 		stringToBuffer("some random text", "utf-8"),
-	// 	);
-	// 	return this.runtime.uploadBlob()
-	// }
+	public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
+		return this.runtime.uploadBlob(blob);
+	}
 
 	public static getFactory() {
 		return this.factory;
