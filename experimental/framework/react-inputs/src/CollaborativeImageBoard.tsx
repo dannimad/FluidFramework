@@ -33,13 +33,15 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 	const [mapValues, setMapValues] = useState<string[]>([]);
 
 	const handleClick = async () => {
-		// setText(map);
 		const randomKey = Math.floor(Math.random() * 100);
-		const randomValue = `https://picsum.photos/id/${randomKey}/200/300`;
-		const imagebuffer = await getImageArrayBuffer(randomValue);
-		const handle = await props.uploadBlob(imagebuffer);
-		console.log(handle);
-		map.set(randomKey.toString(), randomValue.toString());
+		const randomImage = `https://picsum.photos/id/${randomKey}/200/300.jpg`;
+		const imageBuffer = await getImageArrayBuffer(randomImage);
+
+		const handle = await props.uploadBlob(imageBuffer);
+		const phandle = await handle.get();
+		const blob = new Blob([phandle], { type: "image/jpg" });
+		const imageUrl = URL.createObjectURL(blob);
+		map.set(randomKey.toString(), imageUrl);
 	};
 
 	useEffect(() => {
@@ -52,7 +54,15 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 		 * 2. If the change came from a remote source, it may have moved our selection.
 		 * Compute it, update the textarea, and store it in React
 		 */
-		const handleValueChanged = (event: any) => {
+		const handleValueChanged = () => {
+			// const buffers: ArrayBuffer[] = Array.from(map.values());
+			// console.log(buffers);
+			// const imageUrls = buffers.map((buffer) =>
+			// 	URL.createObjectURL(new Blob([buffer], { type: "image/jpg" })),
+			// );
+			// console.log(imageUrls);
+			// setMapValues(imageUrls);
+			// return;
 			setMapValues([...map.values()]);
 		};
 
@@ -68,7 +78,8 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 		// the correct selection before we modify the shared string we need to make sure
 		// this.updateSelection is being called for multiple cases.
 		<div>
-			<h2>Map values:</h2>
+			<h2>Image Board</h2>
+			<button onClick={handleClick}> Random Image </button>
 			<div style={{ display: "flex", flexWrap: "wrap" }}>
 				{Array.from(mapValues.entries()).map(([key, value]) => (
 					<div key={key} style={{ margin: "10px" }}>
@@ -77,7 +88,6 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 					</div>
 				))}
 			</div>
-			<button onClick={handleClick}> Random Number </button>
 		</div>
 	);
 };
