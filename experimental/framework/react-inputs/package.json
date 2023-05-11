@@ -36,9 +36,11 @@
 		"@fluidframework/cell": "workspace:~",
 		"@fluidframework/common-definitions": "^0.20.1",
 		"@fluidframework/common-utils": "^1.1.1",
+		"@fluidframework/map": "workspace:2.0.0-internal.4.3.0",
 		"@fluidframework/merge-tree": "workspace:~",
 		"@fluidframework/sequence": "workspace:~",
-		"react": "^17.0.1"
+		"react": "^17.0.1",
+		"uuid": "^8.3.1"
 	},
 	"devDependencies": {
 		"@fluid-tools/build-cli": "^0.17.0",

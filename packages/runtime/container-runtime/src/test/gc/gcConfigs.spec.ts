@@ -342,7 +342,7 @@ describe("Garbage Collection configurations", () => {
 						[gcSweepGenerationOptionName]: 1,
 					});
 				},
-				(e) => e.errorType === "usageError",
+				(e: any) => e.errorType === "usageError",
 				"Should be unsupported",
 			);
 		});
@@ -799,7 +799,7 @@ describe("Garbage Collection configurations", () => {
 					() => {
 						gc = createGcWithPrivateMembers();
 					},
-					(e) => e.errorType === "usageError",
+					(e: any) => e.errorType === "usageError",
 					"inactiveTimeout must not be greater than sweepTimeout",
 				);
 			});

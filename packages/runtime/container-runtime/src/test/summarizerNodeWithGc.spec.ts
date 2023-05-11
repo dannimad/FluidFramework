@@ -287,7 +287,7 @@ describe("SummarizerNodeWithGC Tests", () => {
 			rootNode.startSummary(11, logger);
 			assert.throws(
 				() => rootNode.completeSummary("test-handle"),
-				(error) => {
+				(error: any) => {
 					const correctErrorMessage = error.message === "NodeDidNotRunGC";
 					const correctErrorId = error.id.value === "";
 					return correctErrorMessage && correctErrorId;
@@ -312,7 +312,7 @@ describe("SummarizerNodeWithGC Tests", () => {
 			const midNodeId = `/${ids[1]}`;
 			assert.throws(
 				() => rootNode.completeSummary("test-handle"),
-				(error) => {
+				(error: any) => {
 					const correctErrorMessage = error.message === "NodeDidNotRunGC";
 					const correctErrorId = error.id.value === midNodeId;
 					return correctErrorMessage && correctErrorId;
@@ -336,7 +336,7 @@ describe("SummarizerNodeWithGC Tests", () => {
 			const leafNodeId = `/${ids[1]}/${ids[2]}`;
 			assert.throws(
 				() => rootNode.completeSummary("test-handle"),
-				(error) => {
+				(error: any) => {
 					const correctErrorMessage = error.message === "NodeDidNotRunGC";
 					const correctErrorId = error.id.value === leafNodeId;
 					return correctErrorMessage && correctErrorId;

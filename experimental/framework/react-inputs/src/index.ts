@@ -14,6 +14,7 @@ export {
 	CollaborativeInput,
 } from "./CollaborativeInput";
 export { CollaborativeTextArea, ICollaborativeTextAreaProps } from "./CollaborativeTextArea";
+export { CollaborativeImageBoard, ICollaborativeImageBoardProps } from "./CollaborativeImageBoard";
 export {
 	ISharedStringHelperEvents,
 	ISharedStringHelperTextChangedEventArgs,
