@@ -39,7 +39,7 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 			if (reader.result instanceof ArrayBuffer) {
 				const handle = await props.uploadBlob(reader.result);
 				// const base64data = reader.result.toString();
-				setMapValues([...mapValues, reader.result]);
+				// setMapValues([...mapValues, reader.result]);
 				map.set(key, handle);
 			}
 		};
@@ -72,15 +72,7 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 				console.log("error");
 			}
 		}
-		/**
-		 * There's been a change to the SharedString's data.
-		 * This means the most recent state of the text is in the SharedString, and we need to...
-		 *
-		 * 1. Store the text state in React
-		 *
-		 * 2. If the change came from a remote source, it may have moved our selection.
-		 * Compute it, update the textarea, and store it in React
-		 */
+
 		const handleValueChanged = () => {
 			updateSharedMap().catch(console.error);
 		};
