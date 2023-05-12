@@ -30,21 +30,48 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 ) => {
 	const { map } = props;
 
-	const [mapValues, setMapValues] = useState<string[]>([]);
+	const [mapValues, setMapValues] = useState<ArrayBuffer[]>([]);
+
+	const cacheImage = async (buffer: ArrayBuffer, key: string): Promise<void> => {
+		const reader = new FileReader();
+		reader.readAsArrayBuffer(new Blob([buffer]));
+		reader.onloadend = async () => {
+			if (reader.result instanceof ArrayBuffer) {
+				const handle = await props.uploadBlob(reader.result);
+				// const base64data = reader.result.toString();
+				setMapValues([...mapValues, reader.result]);
+				map.set(key, handle);
+			}
+		};
+	};
 
 	const handleClick = async () => {
-		const randomKey = Math.floor(Math.random() * 100);
+		const randomKey = Math.floor(Math.random() * 100).toString();
 		const randomImage = `https://picsum.photos/id/${randomKey}/200/300.jpg`;
 		const imageBuffer = await getImageArrayBuffer(randomImage);
+		await cacheImage(imageBuffer, randomKey);
 
-		const handle = await props.uploadBlob(imageBuffer);
-		const phandle = await handle.get();
-		const blob = new Blob([phandle], { type: "image/jpg" });
-		const imageUrl = URL.createObjectURL(blob);
-		map.set(randomKey.toString(), imageUrl);
+		// const handle = await props.uploadBlob(imageBuffer);
+		// map.set(randomKey, handle);
 	};
 
 	useEffect(() => {
+		async function updateSharedMap() {
+			try {
+				const handles = Array.from(map.values());
+				const buffers: ArrayBuffer[] = [];
+				for (const handle of handles) {
+					const buffer = await handle.get();
+					buffers.push(buffer);
+				}
+				console.log("buffers");
+				console.log(buffers);
+				// const promises = handles.map(async (handle) => handle.get() as ArrayBuffer);
+				setMapValues(buffers);
+			} catch {
+				console.log("error");
+			}
+		}
 		/**
 		 * There's been a change to the SharedString's data.
 		 * This means the most recent state of the text is in the SharedString, and we need to...
@@ -55,15 +82,7 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 		 * Compute it, update the textarea, and store it in React
 		 */
 		const handleValueChanged = () => {
-			// const buffers: ArrayBuffer[] = Array.from(map.values());
-			// console.log(buffers);
-			// const imageUrls = buffers.map((buffer) =>
-			// 	URL.createObjectURL(new Blob([buffer], { type: "image/jpg" })),
-			// );
-			// console.log(imageUrls);
-			// setMapValues(imageUrls);
-			// return;
-			setMapValues([...map.values()]);
+			updateSharedMap().catch(console.error);
 		};
 
 		map.on("valueChanged", handleValueChanged);
@@ -83,7 +102,13 @@ export const CollaborativeImageBoard: React.FC<ICollaborativeImageBoardProps> = 
 			<div style={{ display: "flex", flexWrap: "wrap" }}>
 				{Array.from(mapValues.entries()).map(([key, value]) => (
 					<div key={key} style={{ margin: "10px" }}>
-						<img src={value} alt="" style={{ width: "200px" }} />
+						<img
+							src={`data:image/jpg;base64,${btoa(
+								String.fromCharCode(...new Uint8Array(value)),
+							)}`}
+							alt=""
+							style={{ width: "200px" }}
+						/>
 						<p>{key}</p>
 					</div>
 				))}
