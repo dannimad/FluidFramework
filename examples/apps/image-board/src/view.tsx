@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { CollaborativeImageBoard } from "@fluid-experimental/react-inputs";
+import { CollaborativeImageBoard, MapBlobHelper } from "@fluid-experimental/react-inputs";
 import { SharedMap } from "@fluidframework/map";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 
@@ -16,7 +16,9 @@ interface ImageBoardObjectProps {
 export const ImageBoardObjectView = (props: ImageBoardObjectProps) => {
 	return (
 		<div className="map-area">
-			<CollaborativeImageBoard map={props.map} uploadBlob={props.uploadBlob.bind(this)} />
+			<CollaborativeImageBoard
+				mapBlobHelper={new MapBlobHelper(props.map, props.uploadBlob.bind(this))}
+			/>
 		</div>
 	);
 };

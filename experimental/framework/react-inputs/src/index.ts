@@ -20,3 +20,8 @@ export {
 	ISharedStringHelperTextChangedEventArgs,
 	SharedStringHelper,
 } from "./SharedStringHelper";
+export {
+	IMapBlobHelperTextChangedEventArgs,
+	IMapBlobHelperEvents,
+	MapBlobHelper,
+} from "./MapBlobHelper";
