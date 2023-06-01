@@ -474,6 +474,10 @@ export interface IFluidDataStoreContext
 
 	uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
 
+	createAndUseBlob?(
+		blob: ArrayBufferLike,
+		callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown,
+	): Promise<unknown>;
 	/**
 	 * @deprecated - The functionality to get base GC details has been moved to summarizer node.
 	 *

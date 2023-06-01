@@ -16,6 +16,7 @@ import { IDocumentMessage } from '@fluidframework/protocol-definitions';
 import { IDocumentStorageService } from '@fluidframework/driver-definitions';
 import { IEventProvider } from '@fluidframework/common-definitions';
 import { IFluidDataStoreContextDetached } from '@fluidframework/runtime-definitions';
+import { IFluidHandle } from '@fluidframework/core-interfaces';
 import { IFluidRouter } from '@fluidframework/core-interfaces';
 import { IHelpMessage } from '@fluidframework/protocol-definitions';
 import { ILoaderOptions } from '@fluidframework/container-definitions';
@@ -36,6 +37,8 @@ export interface IContainerRuntime extends IProvideContainerRuntime, IProvideFlu
     readonly clientId: string | undefined;
     // (undocumented)
     readonly connected: boolean;
+    // (undocumented)
+    createAndUseBlob?<T>(blob: ArrayBufferLike, callback: (handle: IFluidHandle<ArrayBufferLike>) => T): Promise<T>;
     createDetachedRootDataStore(pkg: Readonly<string[]>, rootDataStoreId: string): IFluidDataStoreContextDetached;
     // (undocumented)
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;

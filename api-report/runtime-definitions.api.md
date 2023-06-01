@@ -248,6 +248,8 @@ export interface IFluidDataStoreContext extends IEventProvider<IFluidDataStoreCo
     readonly connected: boolean;
     // (undocumented)
     readonly containerRuntime: IContainerRuntimeBase;
+    // (undocumented)
+    createAndUseBlob?(blob: ArrayBufferLike, callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown): Promise<unknown>;
     // @deprecated (undocumented)
     readonly createProps?: any;
     // (undocumented)

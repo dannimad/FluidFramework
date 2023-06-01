@@ -192,6 +192,7 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 	private readonly tombstonedBlobs: Set<string> = new Set();
 
 	private readonly sendBlobAttachOp: (localId: string, storageId?: string) => void;
+	private gettingPendingState: boolean;
 
 	constructor(
 		private readonly routeContext: IFluidHandleContext,
@@ -225,7 +226,7 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 			this.mc.config.getBoolean(throwOnTombstoneLoadKey) === true &&
 			this.runtime.gcTombstoneEnforcementAllowed &&
 			this.runtime.clientDetails.type !== summarizerClientType;
-
+		this.gettingPendingState = false;
 		this.runtime.on("disconnected", () => this.onDisconnected());
 		this.redirectTable = this.load(snapshot);
 
@@ -302,6 +303,18 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 			(this.runtime.attachState !== AttachState.Attached && this.redirectTable.size > 0) ||
 			this.pendingBlobs.size > 0
 		);
+	}
+
+	public transitionUploadingBlobsToOffline(): void {
+		this.gettingPendingState = true;
+		for (const [localId, entry] of this.pendingBlobs) {
+			if (entry.status === PendingBlobStatus.OnlinePendingUpload) {
+				// This will submit another BlobAttach op for this blob. This is necessary because the one we sent
+				// already didn't have the local ID.
+				this.transitionToOffline(localId);
+			}
+		}
+		this.gettingPendingState = false;
 	}
 
 	/**
@@ -539,7 +552,7 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 
 	private transitionToOffline(localId: string) {
 		assert(
-			!this.runtime.connected,
+			!this.runtime.connected || this.gettingPendingState,
 			0x388 /* Must only transition to offline flow while runtime is disconnected */,
 		);
 		const entry = this.pendingBlobs.get(localId);

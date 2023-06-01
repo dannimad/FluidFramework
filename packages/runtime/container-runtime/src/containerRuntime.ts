@@ -898,6 +898,7 @@ export class ContainerRuntime
 	private readonly defaultMaxConsecutiveReconnects = 7;
 
 	private _orderSequentiallyCalls: number = 0;
+	private _scheduleLocalOperationCalls: number = 0;
 	private readonly _flushMode: FlushMode;
 	private flushTaskExists = false;
 
@@ -1516,6 +1517,16 @@ export class ContainerRuntime
 				return this._summarizer;
 			}
 			return initializeEntryPoint?.(this);
+		});
+	}
+
+	public async transitionUploadingBlobsToOffline(): Promise<void> {
+		this.verifyNotClosed();
+		this.blobManager.transitionUploadingBlobsToOffline();
+		return new Promise((resolve) => {
+			this.once("schedule_done", () => {
+				resolve();
+			});
 		});
 	}
 
@@ -2910,7 +2921,7 @@ export class ContainerRuntime
 		} else {
 			// Other way is not true = see this.isContainerMessageDirtyable()
 			assert(
-				!dirty || this.hasPendingMessages(),
+				!dirty || this.hasPendingMessages() || this._scheduleLocalOperationCalls > 0,
 				0x3d3 /* if doc is dirty, there has to be pending ops */,
 			);
 		}
@@ -2950,6 +2961,38 @@ export class ContainerRuntime
 	public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
 		this.verifyNotClosed();
 		return this.blobManager.createBlob(blob);
+	}
+
+	public async createAndUseBlob<T>(
+		blob: ArrayBufferLike,
+		callback: (handle: IFluidHandle<ArrayBufferLike>) => T,
+	) {
+		this.verifyNotClosed();
+		return this.scheduleLocalUserOperation(this.uploadBlob(blob), callback);
+	}
+
+	private async scheduleLocalUserOperation<P, T>(
+		dependentP: Promise<P> | (() => Promise<P>),
+		callback: (dependent: P) => T,
+	): Promise<T> {
+		this._scheduleLocalOperationCalls++;
+		this.updateDocumentDirtyState(true);
+		try {
+			const dependent =
+				typeof dependentP === "function" ? await dependentP() : await dependentP;
+			return this.orderSequentially(() => callback(dependent));
+		} finally {
+			// If there are no more pending messages
+			// the document is no longer dirty.
+			this._scheduleLocalOperationCalls--;
+
+			if (this._scheduleLocalOperationCalls === 0) {
+				this.emit("schedule_done");
+			}
+			if (!this.hasPendingMessages()) {
+				this.updateDocumentDirtyState(false);
+			}
+		}
 	}
 
 	private maybeSubmitIdAllocationOp(type: ContainerMessageType) {

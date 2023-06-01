@@ -111,6 +111,8 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     // (undocumented)
     get connected(): boolean;
     // (undocumented)
+    createAndUseBlob<T>(blob: ArrayBufferLike, callback: (handle: IFluidHandle<ArrayBufferLike>) => T): Promise<T>;
+    // (undocumented)
     createDataStore(pkg: string | string[]): Promise<IDataStore>;
     // (undocumented)
     _createDataStoreWithProps(pkg: string | string[], props?: any, id?: string): Promise<IDataStore>;

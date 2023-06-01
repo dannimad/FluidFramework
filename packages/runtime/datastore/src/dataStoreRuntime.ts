@@ -589,6 +589,16 @@ export class FluidDataStoreRuntime
 		return this.dataStoreContext.uploadBlob(blob);
 	}
 
+	public async createAndUseBlob(
+		blob: ArrayBufferLike,
+		callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown,
+	): Promise<unknown> {
+		this.verifyNotClosed();
+		if (this.dataStoreContext.createAndUseBlob !== undefined) {
+			return this.dataStoreContext.createAndUseBlob(blob, callback) as Promise<unknown>;
+		}
+	}
+
 	public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
 		this.verifyNotClosed();
 

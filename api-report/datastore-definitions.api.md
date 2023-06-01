@@ -101,6 +101,8 @@ export interface IFluidDataStoreRuntime extends IFluidRouter, IEventProvider<IFl
     readonly clientId: string | undefined;
     // (undocumented)
     readonly connected: boolean;
+    // (undocumented)
+    createAndUseBlob?(blob: ArrayBufferLike, callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown): Promise<unknown>;
     createChannel(id: string | undefined, type: string): IChannel;
     // (undocumented)
     readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;

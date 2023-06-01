@@ -1020,6 +1020,8 @@ export class Container
 		);
 		assert(!!this.baseSnapshot, 0x5d4 /* no base snapshot */);
 		assert(!!this.baseSnapshotBlobs, 0x5d5 /* no snapshot blobs */);
+		this.context.transitionUploadingBlobsToOffline();
+
 		const pendingState: IPendingContainerState = {
 			pendingRuntimeState: this.context.getPendingLocalState(),
 			baseSnapshot: this.baseSnapshot,

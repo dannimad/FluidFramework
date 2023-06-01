@@ -108,6 +108,10 @@ export interface IFluidDataStoreRuntime
 	 */
 	uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
 
+	createAndUseBlob?(
+		blob: ArrayBufferLike,
+		callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown,
+	): Promise<unknown>;
 	/**
 	 * Submits the signal to be sent to other clients.
 	 * @param type - Type of the signal.

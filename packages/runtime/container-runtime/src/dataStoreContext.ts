@@ -943,6 +943,15 @@ export abstract class FluidDataStoreContext
 	public async uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>> {
 		return this.containerRuntime.uploadBlob(blob);
 	}
+
+	public async createAndUseBlob(
+		blob: ArrayBufferLike,
+		callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown,
+	): Promise<unknown> {
+		if (this.containerRuntime.createAndUseBlob) {
+			return this.containerRuntime.createAndUseBlob(blob, callback) as Promise<unknown>;
+		}
+	}
 }
 
 export class RemoteFluidDataStoreContext extends FluidDataStoreContext {

@@ -438,6 +438,30 @@ describeNoCompat("blobs", (getTestObjectProvider) => {
 		);
 	});
 
+	it("can get useAndCreate", async function () {
+		const testString = "this is a test string";
+		const testKey = "a blob";
+		const container1 = await provider.makeTestContainer(testContainerConfig);
+
+		const dataStore1 = await requestFluidObject<ITestDataObject>(container1, "default");
+
+		if (dataStore1._runtime.createAndUseBlob) {
+			await dataStore1._runtime.createAndUseBlob(
+				stringToBuffer(testString, "utf-8"),
+				(handle: any) => dataStore1._root.set(testKey, handle),
+			);
+		}
+
+		const container2 = await provider.loadTestContainer(testContainerConfig);
+		const dataStore2 = await requestFluidObject<ITestDataObject>(container2, "default");
+
+		await provider.ensureSynchronized();
+
+		const blobHandle = dataStore2._root.get<IFluidHandle<ArrayBufferLike>>(testKey);
+		assert(blobHandle);
+		assert.strictEqual(bufferToString(await blobHandle.get(), "utf-8"), testString);
+	});
+
 	itExpects("serialize/rehydrate then attach", ContainerCloseUsageError, async function () {
 		const detachedBlobStorage = new MockDetachedBlobStorage();
 		const loader = provider.makeTestLoader({

@@ -484,6 +484,8 @@ export interface IRuntime extends IDisposable {
     request(request: IRequest): Promise<IResponse>;
     setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
     setConnectionState(connected: boolean, clientId?: string): any;
+    // (undocumented)
+    transitionUploadingBlobsToOffline?(): void;
 }
 
 // @public (undocumented)
