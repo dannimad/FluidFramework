@@ -334,9 +334,9 @@ export class ContainerContext implements IContainerContext {
 		return this.runtime.getPendingLocalState();
 	}
 
-	public transitionUploadingBlobsToOffline(): void {
+	public async transitionUploadingBlobsToOffline(): Promise<void> {
 		if (this.runtime.transitionUploadingBlobsToOffline !== undefined) {
-			this.runtime.transitionUploadingBlobsToOffline();
+			await this.runtime.transitionUploadingBlobsToOffline();
 			return;
 		}
 	}

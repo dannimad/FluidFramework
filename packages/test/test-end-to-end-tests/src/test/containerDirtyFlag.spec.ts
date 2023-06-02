@@ -76,7 +76,7 @@ const getPendingOps = async (args: ITestObjectProvider, send: boolean, cb: MapCa
 		await args.ensureSynchronized();
 		container.close();
 	} else {
-		pendingState = container.closeAndGetPendingLocalState();
+		pendingState = await container.closeAndGetPendingLocalState();
 	}
 
 	args.opProcessingController.resumeProcessing();

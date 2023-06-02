@@ -57,7 +57,7 @@ export interface IContainerConfig {
 
 // @internal
 export interface IContainerExperimental extends IContainer {
-    getPendingLocalState(): string;
+    getPendingLocalState(): Promise<string>;
 }
 
 // @internal @deprecated (undocumented)

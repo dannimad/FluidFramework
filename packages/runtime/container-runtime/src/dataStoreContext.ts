@@ -949,7 +949,7 @@ export abstract class FluidDataStoreContext
 		callback: (handle: IFluidHandle<ArrayBufferLike>) => unknown,
 	): Promise<unknown> {
 		if (this.containerRuntime.createAndUseBlob) {
-			return this.containerRuntime.createAndUseBlob(blob, callback) as Promise<unknown>;
+			return this.containerRuntime.createAndUseBlob(blob, callback);
 		}
 	}
 }

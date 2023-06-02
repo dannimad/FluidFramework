@@ -134,7 +134,7 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
     readonly audience: IAudience;
     readonly clientId?: string | undefined;
     close(error?: ICriticalContainerError): void;
-    closeAndGetPendingLocalState(): string;
+    closeAndGetPendingLocalState(): Promise<string>;
     readonly closed: boolean;
     connect(): void;
     readonly connectionState: ConnectionState;
@@ -485,7 +485,7 @@ export interface IRuntime extends IDisposable {
     setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
     setConnectionState(connected: boolean, clientId?: string): any;
     // (undocumented)
-    transitionUploadingBlobsToOffline?(): void;
+    transitionUploadingBlobsToOffline?(): Promise<void>;
 }
 
 // @public (undocumented)

@@ -371,7 +371,7 @@ export interface IContainer extends IEventProvider<IContainerEvents>, IFluidRout
 	 * @experimental
 	 * {@link https://github.com/microsoft/FluidFramework/blob/main/packages/loader/container-loader/closeAndGetPendingLocalState.md}
 	 */
-	closeAndGetPendingLocalState(): string;
+	closeAndGetPendingLocalState(): Promise<string>;
 
 	/**
 	 * Propose new code details that define the code to be loaded for this container's runtime.

@@ -94,7 +94,7 @@ export interface IRuntime extends IDisposable {
 	 */
 	getPendingLocalState(): unknown;
 
-	transitionUploadingBlobsToOffline?(): void;
+	transitionUploadingBlobsToOffline?(): Promise<void>;
 	/**
 	 * Notify runtime that container is moving to "Attaching" state
 	 * @param snapshot - snapshot created at attach time

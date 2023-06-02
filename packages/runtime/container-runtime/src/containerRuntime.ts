@@ -1524,9 +1524,13 @@ export class ContainerRuntime
 		this.verifyNotClosed();
 		this.blobManager.transitionUploadingBlobsToOffline();
 		return new Promise((resolve) => {
-			this.once("schedule_done", () => {
+			if (this._scheduleLocalOperationCalls > 0) {
+				this.once("schedule_done", () => {
+					resolve();
+				});
+			} else {
 				resolve();
-			});
+			}
 		});
 	}
 
@@ -2980,12 +2984,9 @@ export class ContainerRuntime
 		try {
 			const dependent =
 				typeof dependentP === "function" ? await dependentP() : await dependentP;
-			return this.orderSequentially(() => callback(dependent));
+			return callback(dependent);
 		} finally {
-			// If there are no more pending messages
-			// the document is no longer dirty.
 			this._scheduleLocalOperationCalls--;
-
 			if (this._scheduleLocalOperationCalls === 0) {
 				this.emit("schedule_done");
 			}

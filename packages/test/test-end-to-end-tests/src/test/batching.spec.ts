@@ -625,7 +625,7 @@ describeNoCompat("Flushing ops", (getTestObjectProvider) => {
 				dataObject1map1.set("key1", "value1");
 				dataObject1map2.set("key2", "value2");
 				assert.throws(
-					() => container1.closeAndGetPendingLocalState(),
+					async () => container1.closeAndGetPendingLocalState(),
 					/can't get state during orderSequentially/,
 				);
 				dataObject1map1.set("key3", "value3");

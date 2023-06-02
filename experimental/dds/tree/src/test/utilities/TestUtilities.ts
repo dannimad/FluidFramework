@@ -684,6 +684,6 @@ export async function withContainerOffline<TReturn>(
 	await provider.ensureSynchronized();
 	await provider.opProcessingController.pauseProcessing(container);
 	const actionReturn = action();
-	const pendingLocalState = container.closeAndGetPendingLocalState();
+	const pendingLocalState = await container.closeAndGetPendingLocalState();
 	return { actionReturn, pendingLocalState };
 }

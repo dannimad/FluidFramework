@@ -595,7 +595,7 @@ export class FluidDataStoreRuntime
 	): Promise<unknown> {
 		this.verifyNotClosed();
 		if (this.dataStoreContext.createAndUseBlob !== undefined) {
-			return this.dataStoreContext.createAndUseBlob(blob, callback) as Promise<unknown>;
+			return this.dataStoreContext.createAndUseBlob(blob, callback);
 		}
 	}
 
