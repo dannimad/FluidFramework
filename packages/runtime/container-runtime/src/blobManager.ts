@@ -55,7 +55,7 @@ import { summarizerClientType } from "./summary";
  */
 export class BlobHandle implements IFluidHandle<ArrayBufferLike> {
 	private attached: boolean = false;
-	private readonly deleteHandle?: () => void;
+	private readonly onAttach?: () => void;
 
 	public get IFluidHandle(): IFluidHandle {
 		return this;
@@ -71,16 +71,16 @@ export class BlobHandle implements IFluidHandle<ArrayBufferLike> {
 		public readonly path: string,
 		public readonly routeContext: IFluidHandleContext,
 		public get: () => Promise<any>,
-		deleteHandle?: () => void,
+		onAttach?: () => void,
 	) {
 		this.absolutePath = generateHandleContextPath(path, this.routeContext);
-		this.deleteHandle = deleteHandle;
+		this.onAttach = onAttach;
 	}
 
 	public attachGraph() {
 		this.attached = true;
-		if (this.isAttached && this.deleteHandle) {
-			this.deleteHandle();
+		if (this.isAttached && this.onAttach) {
+			this.onAttach();
 		}
 	}
 
@@ -172,8 +172,6 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 	 * we must save it. This is true for both the online and offline flow.
 	 */
 	private readonly pendingBlobs: Map<string, PendingBlob> = new Map();
-
-	private readonly pendingHandles: Map<string, IFluidHandle<ArrayBufferLike>> = new Map();
 
 	/**
 	 * Track ops in flight for online flow. This is used for optimizations where if we receive an ack for a storage ID,
@@ -404,14 +402,14 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 			this.redirectTable.has(id) || this.pendingBlobs.has(id),
 			0x384 /* requesting handle for unknown blob */,
 		);
-		const deleteHandle = () => {
-			this.pendingHandles.delete(id);
+		const onAttachGraph = () => {
+			// this.pendingHandles.delete(id);
 		};
 		return new BlobHandle(
 			`${BlobManager.basePath}/${id}`,
 			this.routeContext,
 			async () => this.getBlob(id),
-			deleteHandle,
+			onAttachGraph,
 		);
 	}
 
@@ -506,9 +504,7 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 					// an existing blob, we don't have to wait for the op to be ack'd since this step has already
 					// happened before and so, the server won't delete it.
 					this.setRedirection(localId, response.id);
-					const blobHandle = this.getBlobHandle(localId);
-					this.pendingHandles.set(localId, blobHandle);
-					entry.handleP.resolve(blobHandle);
+					entry.handleP.resolve(this.getBlobHandle(localId));
 					this.deleteAndEmitsIfEmpty(localId);
 				} else {
 					// If there is already an op for this storage ID, append the local ID to the list. Once any op for
@@ -583,9 +579,7 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 				? PendingBlobStatus.OfflinePendingUpload
 				: PendingBlobStatus.OfflinePendingOp;
 
-		const blobHandle = this.getBlobHandle(localId);
-		this.pendingHandles.set(localId, blobHandle);
-		entry.handleP.resolve(blobHandle);
+		entry.handleP.resolve(this.getBlobHandle(localId));
 	}
 
 	/**
@@ -643,9 +637,7 @@ export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 					// It's possible we transitioned to offline flow while waiting for this op.
 					if (pendingBlobEntry.status === PendingBlobStatus.OnlinePendingOp) {
 						this.setRedirection(pendingLocalId, blobId);
-						const blobHandle = this.getBlobHandle(localId);
-						this.pendingHandles.set(localId, blobHandle);
-						pendingBlobEntry.handleP.resolve(blobHandle);
+						pendingBlobEntry.handleP.resolve(this.getBlobHandle(localId));
 						this.deleteAndEmitsIfEmpty(pendingLocalId);
 					}
 				});
