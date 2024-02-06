@@ -1358,6 +1358,35 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		assert.strictEqual(savedOps3.length, 3); // how are you, world and hello
 	});
 
+	it("snapshot seq number is one below the first saved op", async function() {
+		// to not use an empty base snapshot
+		string1.insertText(0, "world");
+		string1.insertText(0, "hello ");
+		string1.insertText(0, "hi ");
+		await waitForSummary();
+		await provider.ensureSynchronized();
+		const container2: IContainerExperimental = await loader.resolve({url});
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
+		// to have savedOps in the stashed container
+		string2.insertText(0, "1");
+		string1.insertText(0, "2");
+		string2.insertText(0, "3");
+		string1.insertText(0, "4");
+		await provider.ensureSynchronized();
+
+		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
+		assert(containerStateString2);
+		const containerState2 = JSON.parse(containerStateString2);
+		const baseSnapshotAttributesId2 =
+			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes2 = JSON.parse(
+			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
+		);
+		assert.strictEqual(baseSnapshotAttibutes2.sequenceNumber, containerState2.savedOps[0].sequenceNumber -1);
+
+	});
+
 	it("validates baseSnapshot attributes", async function () {
 		await waitForContainerConnection(container1);
 		await provider.ensureSynchronized();
