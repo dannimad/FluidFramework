@@ -1526,6 +1526,46 @@ export class Container
 		return versions[0];
 	}
 
+	private refreshPendingStateAttributes() {
+		// return;
+		// const { snapshot, } = await this.fetchSnapshot(undefined);
+		// this.getVersion(null).then(version => {
+		// 	if(version?.id === this._loadedFromVersion?.id) {
+		// 		return false;
+		// 	}
+		// 	return true;
+		// }).then(async isNewVersion => {
+		// 	if(!isNewVersion) {
+		// 		return;
+		// 	}
+		// 	return this.fetchSnapshot(undefined);
+
+		// })
+		this.fetchSnapshot(undefined).then(async ({snapshot, }) => {
+				const snapshotTree: ISnapshotTree | undefined = isInstanceOfISnapshot(snapshot)
+					? snapshot.snapshotTree
+					: snapshot;
+				assert(snapshotTree !== undefined, "Snapshot should exist");
+				const blobs = await getBlobContentsFromTree(snapshotTree, this.storageAdapter);
+				this.attachmentData = {
+					state: AttachState.Attached,
+					snapshot: { tree: snapshotTree, blobs },
+				};
+				const attributes: IDocumentAttributes = await this.getDocumentAttributes(
+					this.storageAdapter,
+					snapshotTree,
+				);
+				if (this.savedOps.length > 0) {
+					const savedOpsFirstSequenceNumber = this.savedOps[0].sequenceNumber;
+					this.savedOps.splice(
+						0,
+						attributes.sequenceNumber - savedOpsFirstSequenceNumber + 1,
+					);
+				}
+			})
+			.catch((error) => console.log(error));
+	}
+
 	private connectToDeltaStream(args: IConnectionArgs) {
 		// All agents need "write" access, including summarizer.
 		if (!this._canReconnect || !this.client.details.capabilities.interactive) {
@@ -1797,6 +1837,9 @@ export class Container
 			throw new Error("Container was closed while load()");
 		}
 
+		if (pendingLocalState) {
+			this.refreshPendingStateAttributes();
+		}
 		// Internal context is fully loaded at this point
 		this.setLoaded();
 		timings.end = performance.now();
@@ -2335,6 +2378,9 @@ export class Container
 	private processRemoteMessage(message: ISequencedDocumentMessage) {
 		if (this.offlineLoadEnabled) {
 			this.savedOps.push(message);
+			if(!this._dirtyContainer && this.savedOps.length > 100) {
+				this.refreshPendingStateAttributes();
+			}
 		}
 		const local = this.clientId === message.clientId;
 

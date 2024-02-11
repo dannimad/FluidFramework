@@ -1100,6 +1100,260 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		},
 	);
 
+	it("validates pending object", async function () {
+		await waitForContainerConnection(container1);
+		await provider.ensureSynchronized();
+		await provider.opProcessingController.pauseProcessing(container1);
+		string1.insertText(0, "world");
+		const containerStateString = await container1.closeAndGetPendingLocalState?.();
+		provider.opProcessingController.resumeProcessing();
+		assert(containerStateString);
+		const containerState = JSON.parse(containerStateString);
+
+		const isIPendingContainerState = (c: any) => {
+			if (
+				c?.pendingRuntimeState === undefined ||
+				c?.baseSnapshot === undefined ||
+				c?.snapshotBlobs === undefined ||
+				c?.savedOps === undefined ||
+				c?.url === undefined
+			) {
+				return false;
+			}
+			return true;
+		};
+		assert.strictEqual(isIPendingContainerState(containerState), true);
+	});
+
+	it("validates pending and saved ops", async function () {
+		await waitForContainerConnection(container1);
+		await provider.ensureSynchronized();
+		await provider.opProcessingController.pauseProcessing(container1);
+		string1.insertText(0, "world ");
+		const containerStateString = await container1.closeAndGetPendingLocalState?.();
+		provider.opProcessingController.resumeProcessing();
+		assert(containerStateString);
+		const containerState = JSON.parse(containerStateString);
+		const pendingOps = containerState.pendingRuntimeState.pending.pendingStates;
+		assert.strictEqual(pendingOps.length, 2); // hello and world
+		const savedOps = containerState.savedOps.filter((op) => op.type === "op");
+		assert.strictEqual(savedOps.length, 1); // just hello
+		const container2: IContainerExperimental = await loader.resolve(
+			{ url },
+			containerStateString,
+		);
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
+		await waitForContainerConnection(container2);
+		await provider.opProcessingController.pauseProcessing(container2);
+		string2.insertText(0, "how are you ");
+
+		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
+		provider.opProcessingController.resumeProcessing();
+		assert(containerStateString2);
+		const containerState2 = JSON.parse(containerStateString2);
+		const pendingOps2 = containerState2.pendingRuntimeState.pending.pendingStates;
+		assert.strictEqual(pendingOps2.length, 2); // world and how are you
+		const savedOps2 = containerState2.savedOps.filter((op) => op.type === "op");
+		assert.strictEqual(savedOps2.length, 1); // hello
+
+		const container3: IContainerExperimental = await loader.resolve(
+			{ url },
+			containerStateString2,
+		);
+		const dataStore3 = (await container3.getEntryPoint()) as ITestFluidObject;
+		const string3 = await dataStore3.getSharedObject<SharedString>(stringId);
+		await waitForContainerConnection(container3);
+		await provider.ensureSynchronized();
+		assert.strictEqual(string3.getText(), "how are you world hello");
+		const containerStateString3 = await container3.closeAndGetPendingLocalState?.();
+		assert(containerStateString3);
+		const containerState3 = JSON.parse(containerStateString3);
+		assert.strictEqual(containerState3.pendingRuntimeState, undefined);
+		const savedOps3 = containerState3.savedOps.filter((op) => op.type === "op");
+		assert.strictEqual(savedOps3.length, 3); // how are you, world and hello
+	});
+
+	it("snapshot seq number is one below the first saved op", async function () {
+		// to not use an empty base snapshot
+		string1.insertText(0, "world");
+		string1.insertText(0, "hello ");
+		string1.insertText(0, "hi ");
+		await waitForSummary();
+		await provider.ensureSynchronized();
+		const container2: IContainerExperimental = await loader.resolve({ url });
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
+		// to have savedOps in the stashed container
+		string2.insertText(0, "1");
+		string1.insertText(0, "2");
+		string2.insertText(0, "3");
+		string1.insertText(0, "4");
+		await provider.ensureSynchronized();
+
+		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
+		assert(containerStateString2);
+		const containerState2 = JSON.parse(containerStateString2);
+		const baseSnapshotAttributesId2 =
+			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes2 = JSON.parse(
+			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
+		);
+		assert.strictEqual(
+			baseSnapshotAttibutes2.sequenceNumber,
+			containerState2.savedOps[0].sequenceNumber - 1,
+		);
+	});
+
+	it("refresh after several ops ", async function () {
+		// this should refresh 
+		for(let i=0; i<50; i++){
+			string1.insertText(0, "AAA");
+			string1.insertText(0, "BBB");
+		}
+
+		await waitForSummary();
+		await provider.ensureSynchronized();
+
+		const containerStateString2 = await container1.closeAndGetPendingLocalState?.();
+		assert(containerStateString2);
+		const containerState2 = JSON.parse(containerStateString2);
+		const baseSnapshotAttributesId2 =
+			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes2 = JSON.parse(
+			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
+		);
+		assert(baseSnapshotAttibutes2.sequenceNumber !== 0,"base snapshot is the same as when we load");
+		assert.strictEqual(
+			baseSnapshotAttibutes2.sequenceNumber,
+			containerState2.savedOps[0].sequenceNumber - 1,
+		);
+	});
+
+	it("moving the base snapshot with only saved ops", async function () {
+		// to start in a non empty container
+		// string1.insertText(0, "AAA");
+		// await waitForSummary();
+		// string1.insertText(0, "BBB");
+		await provider.ensureSynchronized();
+		const container2: IContainerExperimental = await loader.resolve({ url });
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
+
+		// to have savedOps in the stashed container
+		string2.insertText(0, "CCC");
+		string2.insertText(0, "DDD");
+		await provider.ensureSynchronized();
+
+		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
+		assert(containerStateString2);
+		const containerState2 = JSON.parse(containerStateString2);
+		const baseSnapshotAttributesId2 =
+			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes2 = JSON.parse(
+			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
+		);
+		assert.strictEqual(
+			baseSnapshotAttibutes2.sequenceNumber,
+			containerState2.savedOps[0].sequenceNumber - 1,
+		);
+		string1.insertText(0, "EEE");
+		await waitForSummary(); 
+		string1.insertText(0, "FFF");
+		await provider.ensureSynchronized();
+		const container3: IContainerExperimental = await loader.resolve(
+			{ url },
+			containerStateString2,
+		);
+		const dataStore3 = (await container3.getEntryPoint()) as ITestFluidObject;
+		const string3 = await dataStore3.getSharedObject<SharedString>(stringId);
+		await waitForContainerConnection(container3);
+		string1.insertText(0, "GGG");
+		await provider.ensureSynchronized();
+		assert.strictEqual(string1.getText(), string3.getText());
+		const containerStateString3 = await container3.closeAndGetPendingLocalState?.();
+		assert(containerStateString3);
+		const containerState3 = JSON.parse(containerStateString3);
+		const baseSnapshotAttributesId3 =
+			containerState3.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes3 = JSON.parse(
+			containerState3.snapshotBlobs[baseSnapshotAttributesId3],
+		);
+		// the base snapshot was refreshed
+		assert(baseSnapshotAttibutes2.sequenceNumber < baseSnapshotAttibutes3.sequenceNumber);
+		assert.strictEqual(
+			baseSnapshotAttibutes3.sequenceNumber,
+			containerState3.savedOps[0].sequenceNumber - 1,
+		);
+		const container4: IContainerExperimental = await loader.resolve(
+			{ url },
+			containerStateString3,
+		);
+		const dataStore4 = (await container4.getEntryPoint()) as ITestFluidObject;
+		const string4 = await dataStore4.getSharedObject<SharedString>(stringId);
+		await waitForContainerConnection(container4);
+		assert.strictEqual(string1.getText(), string4.getText());
+	});
+
+	it("validates baseSnapshot attributes", async function () {
+		await waitForContainerConnection(container1);
+		await provider.ensureSynchronized();
+		// stash a container with a pending op
+		await provider.opProcessingController.pauseProcessing(container1);
+		string1.insertText(0, "world");
+		const containerStateString = await container1.closeAndGetPendingLocalState?.();
+		assert(containerStateString);
+		const containerState = JSON.parse(containerStateString);
+		// snapshot attributes checks
+		const baseSnapshotAttributesId =
+			containerState.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes = JSON.parse(
+			containerState.snapshotBlobs[baseSnapshotAttributesId],
+		);
+		assert.strictEqual(baseSnapshotAttibutes.minimumSequenceNumber, 0);
+		assert.strictEqual(baseSnapshotAttibutes.sequenceNumber, 0);
+
+		const container2: IContainerExperimental = await loader.resolve(
+			{ url },
+			containerStateString,
+		);
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
+		await waitForContainerConnection(container2);
+		string2.insertText(0, "how are you");
+
+		const waitForSummary2 = async (container) => {
+			await new Promise<void>((resolve, reject) => {
+				let summarized = false;
+				container.on("op", (op) => {
+					if (op.type === "summarize") {
+						summarized = true;
+					} else if (summarized && op.type === "summaryAck") {
+						resolve();
+					} else if (op.type === "summaryNack") {
+						reject(new Error("summaryNack"));
+					}
+				});
+			});
+		};
+		// We will wait for a new summary to make sure next time we stashed a container
+		// we get a new snapshot.
+		await waitForSummary2(container2);
+		await provider.ensureSynchronized();
+
+		const container2StateString = await container2.closeAndGetPendingLocalState?.();
+		assert(container2StateString);
+		const container2State = JSON.parse(container2StateString);
+		const baseSnapshotAttributesId2 =
+			container2State.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+		const baseSnapshotAttibutes2 = JSON.parse(
+			container2State.snapshotBlobs[baseSnapshotAttributesId2],
+		);
+		// when we refresh the base snapshot these new attributes will be different than original ones.
+		assert.strictEqual(baseSnapshotAttibutes2.minimumSequenceNumber, 0);
+		assert.strictEqual(baseSnapshotAttibutes2.sequenceNumber, 0);
+	});
+
 	it("can make changes offline and resubmit them", async function () {
 		const pendingOps = await getPendingOps(provider, false, async (c, d) => {
 			const map = await d.getSharedObject<SharedMap>(mapId);
@@ -1282,167 +1536,6 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 			bufferToString(await map2.get("blob handle").get(), "utf8"),
 			"blob contents",
 		);
-	});
-
-	it("validates pending object", async function () {
-		await waitForContainerConnection(container1);
-		await provider.ensureSynchronized();
-		await provider.opProcessingController.pauseProcessing(container1);
-		string1.insertText(0, "world");
-		const containerStateString = await container1.closeAndGetPendingLocalState?.();
-		provider.opProcessingController.resumeProcessing();
-		assert(containerStateString);
-		const containerState = JSON.parse(containerStateString);
-
-		const isIPendingContainerState = (c: any) => {
-			if (
-				c?.pendingRuntimeState === undefined ||
-				c?.baseSnapshot === undefined ||
-				c?.snapshotBlobs === undefined ||
-				c?.savedOps === undefined ||
-				c?.url === undefined
-			) {
-				return false;
-			}
-			return true;
-		};
-		assert.strictEqual(isIPendingContainerState(containerState), true);
-	});
-
-	it("validates pending and saved ops", async function () {
-		await waitForContainerConnection(container1);
-		await provider.ensureSynchronized();
-		await provider.opProcessingController.pauseProcessing(container1);
-		string1.insertText(0, "world ");
-		const containerStateString = await container1.closeAndGetPendingLocalState?.();
-		provider.opProcessingController.resumeProcessing();
-		assert(containerStateString);
-		const containerState = JSON.parse(containerStateString);
-		const pendingOps = containerState.pendingRuntimeState.pending.pendingStates;
-		assert.strictEqual(pendingOps.length, 2); // hello and world
-		const savedOps = containerState.savedOps.filter((op) => op.type === "op");
-		assert.strictEqual(savedOps.length, 1); // just hello
-		const container2: IContainerExperimental = await loader.resolve(
-			{ url },
-			containerStateString,
-		);
-		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
-		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
-		await waitForContainerConnection(container2);
-		await provider.opProcessingController.pauseProcessing(container2);
-		string2.insertText(0, "how are you ");
-
-		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
-		provider.opProcessingController.resumeProcessing();
-		assert(containerStateString2);
-		const containerState2 = JSON.parse(containerStateString2);
-		const pendingOps2 = containerState2.pendingRuntimeState.pending.pendingStates;
-		assert.strictEqual(pendingOps2.length, 2); // world and how are you
-		const savedOps2 = containerState2.savedOps.filter((op) => op.type === "op");
-		assert.strictEqual(savedOps2.length, 1); // hello
-
-		const container3: IContainerExperimental = await loader.resolve(
-			{ url },
-			containerStateString2,
-		);
-		const dataStore3 = (await container3.getEntryPoint()) as ITestFluidObject;
-		const string3 = await dataStore3.getSharedObject<SharedString>(stringId);
-		await waitForContainerConnection(container3);
-		await provider.ensureSynchronized();
-		assert.strictEqual(string3.getText(), "how are you world hello");
-		const containerStateString3 = await container3.closeAndGetPendingLocalState?.();
-		assert(containerStateString3);
-		const containerState3 = JSON.parse(containerStateString3);
-		assert.strictEqual(containerState3.pendingRuntimeState, undefined);
-		const savedOps3 = containerState3.savedOps.filter((op) => op.type === "op");
-		assert.strictEqual(savedOps3.length, 3); // how are you, world and hello
-	});
-
-	it("snapshot seq number is one below the first saved op", async function() {
-		// to not use an empty base snapshot
-		string1.insertText(0, "world");
-		string1.insertText(0, "hello ");
-		string1.insertText(0, "hi ");
-		await waitForSummary();
-		await provider.ensureSynchronized();
-		const container2: IContainerExperimental = await loader.resolve({url});
-		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
-		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
-		// to have savedOps in the stashed container
-		string2.insertText(0, "1");
-		string1.insertText(0, "2");
-		string2.insertText(0, "3");
-		string1.insertText(0, "4");
-		await provider.ensureSynchronized();
-
-		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
-		assert(containerStateString2);
-		const containerState2 = JSON.parse(containerStateString2);
-		const baseSnapshotAttributesId2 =
-			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
-		const baseSnapshotAttibutes2 = JSON.parse(
-			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
-		);
-		assert.strictEqual(baseSnapshotAttibutes2.sequenceNumber, containerState2.savedOps[0].sequenceNumber -1);
-
-	});
-
-	it("validates baseSnapshot attributes", async function () {
-		await waitForContainerConnection(container1);
-		await provider.ensureSynchronized();
-		// stash a container with a pending op
-		await provider.opProcessingController.pauseProcessing(container1);
-		string1.insertText(0, "world");
-		const containerStateString = await container1.closeAndGetPendingLocalState?.();
-		assert(containerStateString);
-		const containerState = JSON.parse(containerStateString);
-		// snapshot attributes checks
-		const baseSnapshotAttributesId =
-			containerState.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
-		const baseSnapshotAttibutes = JSON.parse(
-			containerState.snapshotBlobs[baseSnapshotAttributesId],
-		);
-		assert.strictEqual(baseSnapshotAttibutes.minimumSequenceNumber, 0);
-		assert.strictEqual(baseSnapshotAttibutes.sequenceNumber, 0);
-
-		const container2: IContainerExperimental = await loader.resolve(
-			{ url },
-			containerStateString,
-		);
-		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
-		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
-		await waitForContainerConnection(container2);
-		string2.insertText(0, "how are you");
-		await provider.ensureSynchronized();
-
-		const waitForSummary2 = async (container) => {
-			await new Promise<void>((resolve, reject) => {
-				let summarized = false;
-				container.on("op", (op) => {
-					if (op.type === "summarize") {
-						summarized = true;
-					} else if (summarized && op.type === "summaryAck") {
-						resolve();
-					} else if (op.type === "summaryNack") {
-						reject(new Error("summaryNack"));
-					}
-				});
-			});
-		};
-		// We will wait for a new summary to make sure next time we stashed a container
-		// we get a new snapshot.
-		await waitForSummary2(container2);
-		const container2StateString = await container2.closeAndGetPendingLocalState?.();
-		assert(container2StateString);
-		const container2State = JSON.parse(container2StateString);
-		const baseSnapshotAttributesId2 =
-			container2State.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
-		const baseSnapshotAttibutes2 = JSON.parse(
-			container2State.snapshotBlobs[baseSnapshotAttributesId2],
-		);
-		// when we refresh the base snapshot these new attributes will be different than original ones.
-		assert.strictEqual(baseSnapshotAttibutes2.minimumSequenceNumber, 0);
-		assert.strictEqual(baseSnapshotAttibutes2.sequenceNumber, 0);
 	});
 
 	it("close while uploading blob", async function () {
