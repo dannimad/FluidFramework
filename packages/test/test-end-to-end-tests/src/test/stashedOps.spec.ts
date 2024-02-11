@@ -1126,18 +1126,15 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 	});
 
 	it("validates pending and saved ops", async function () {
-		await waitForContainerConnection(container1);
-		await provider.ensureSynchronized();
 		await provider.opProcessingController.pauseProcessing(container1);
 		string1.insertText(0, "world ");
 		const containerStateString = await container1.closeAndGetPendingLocalState?.();
-		provider.opProcessingController.resumeProcessing();
 		assert(containerStateString);
 		const containerState = JSON.parse(containerStateString);
 		const pendingOps = containerState.pendingRuntimeState.pending.pendingStates;
 		assert.strictEqual(pendingOps.length, 2); // hello and world
 		const savedOps = containerState.savedOps.filter((op) => op.type === "op");
-		assert.strictEqual(savedOps.length, 1); // just hello
+		assert.strictEqual(savedOps.length, 0);
 		const container2: IContainerExperimental = await loader.resolve(
 			{ url },
 			containerStateString,
@@ -1145,18 +1142,17 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
 		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
 		await waitForContainerConnection(container2);
+		await provider.ensureSynchronized();
 		await provider.opProcessingController.pauseProcessing(container2);
 		string2.insertText(0, "how are you ");
-
 		const containerStateString2 = await container2.closeAndGetPendingLocalState?.();
 		provider.opProcessingController.resumeProcessing();
 		assert(containerStateString2);
 		const containerState2 = JSON.parse(containerStateString2);
 		const pendingOps2 = containerState2.pendingRuntimeState.pending.pendingStates;
-		assert.strictEqual(pendingOps2.length, 2); // world and how are you
+		assert.strictEqual(pendingOps2.length, 3); // hello, world and how are you
 		const savedOps2 = containerState2.savedOps.filter((op) => op.type === "op");
-		assert.strictEqual(savedOps2.length, 1); // hello
-
+		assert.strictEqual(savedOps2.length, 2); // hello and world
 		const container3: IContainerExperimental = await loader.resolve(
 			{ url },
 			containerStateString2,
@@ -1175,7 +1171,7 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 	});
 
 	it("snapshot seq number is one below the first saved op", async function () {
-		// to not use an empty base snapshot
+		// to not use an empty base snapshot for container2
 		string1.insertText(0, "world");
 		string1.insertText(0, "hello ");
 		string1.insertText(0, "hi ");
@@ -1205,42 +1201,17 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		);
 	});
 
-	it("refresh after several ops ", async function () {
-		// this should refresh 
-		for(let i=0; i<50; i++){
-			string1.insertText(0, "AAA");
-			string1.insertText(0, "BBB");
-		}
-
-		await waitForSummary();
-		await provider.ensureSynchronized();
-
-		const containerStateString2 = await container1.closeAndGetPendingLocalState?.();
-		assert(containerStateString2);
-		const containerState2 = JSON.parse(containerStateString2);
-		const baseSnapshotAttributesId2 =
-			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
-		const baseSnapshotAttibutes2 = JSON.parse(
-			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
-		);
-		assert(baseSnapshotAttibutes2.sequenceNumber !== 0,"base snapshot is the same as when we load");
-		assert.strictEqual(
-			baseSnapshotAttibutes2.sequenceNumber,
-			containerState2.savedOps[0].sequenceNumber - 1,
-		);
-	});
-
-	it("moving the base snapshot with only saved ops", async function () {
-		// to start in a non empty container
-		// string1.insertText(0, "AAA");
-		// await waitForSummary();
-		// string1.insertText(0, "BBB");
+	it("refresh the base snapshot at loading", async function () {
+		// to not use an empty base snapshot for container2
+		string1.insertText(0, "AAA");
+		string1.insertText(0, "BBB");
+		await waitForSummary();		
 		await provider.ensureSynchronized();
 		const container2: IContainerExperimental = await loader.resolve({ url });
 		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
 		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
 
-		// to have savedOps in the stashed container
+		// to have more savedOps in the stashed container
 		string2.insertText(0, "CCC");
 		string2.insertText(0, "DDD");
 		await provider.ensureSynchronized();
@@ -1257,8 +1228,10 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 			baseSnapshotAttibutes2.sequenceNumber,
 			containerState2.savedOps[0].sequenceNumber - 1,
 		);
+		// send ops and summarize after stashing 
 		string1.insertText(0, "EEE");
 		await waitForSummary(); 
+		// send another op just to check it works with saved ops after summarize
 		string1.insertText(0, "FFF");
 		await provider.ensureSynchronized();
 		const container3: IContainerExperimental = await loader.resolve(
@@ -1270,6 +1243,7 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		await waitForContainerConnection(container3);
 		string1.insertText(0, "GGG");
 		await provider.ensureSynchronized();
+		// no corruption after "coming back online" and ops were sent in the meanwhile
 		assert.strictEqual(string1.getText(), string3.getText());
 		const containerStateString3 = await container3.closeAndGetPendingLocalState?.();
 		assert(containerStateString3);
@@ -1279,7 +1253,7 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		const baseSnapshotAttibutes3 = JSON.parse(
 			containerState3.snapshotBlobs[baseSnapshotAttributesId3],
 		);
-		// the base snapshot was refreshed
+		// the base snapshot was refreshed. sequenceNumber would be the same in case we don't
 		assert(baseSnapshotAttibutes2.sequenceNumber < baseSnapshotAttibutes3.sequenceNumber);
 		assert.strictEqual(
 			baseSnapshotAttibutes3.sequenceNumber,
@@ -1292,66 +1266,32 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 		const dataStore4 = (await container4.getEntryPoint()) as ITestFluidObject;
 		const string4 = await dataStore4.getSharedObject<SharedString>(stringId);
 		await waitForContainerConnection(container4);
+		// all correct after applying a stashed container with a refresh snapshot
 		assert.strictEqual(string1.getText(), string4.getText());
 	});
-
-	it("validates baseSnapshot attributes", async function () {
-		await waitForContainerConnection(container1);
-		await provider.ensureSynchronized();
-		// stash a container with a pending op
-		await provider.opProcessingController.pauseProcessing(container1);
-		string1.insertText(0, "world");
-		const containerStateString = await container1.closeAndGetPendingLocalState?.();
-		assert(containerStateString);
-		const containerState = JSON.parse(containerStateString);
-		// snapshot attributes checks
-		const baseSnapshotAttributesId =
-			containerState.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
-		const baseSnapshotAttibutes = JSON.parse(
-			containerState.snapshotBlobs[baseSnapshotAttributesId],
-		);
-		assert.strictEqual(baseSnapshotAttibutes.minimumSequenceNumber, 0);
-		assert.strictEqual(baseSnapshotAttibutes.sequenceNumber, 0);
-
-		const container2: IContainerExperimental = await loader.resolve(
-			{ url },
-			containerStateString,
-		);
-		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
-		const string2 = await dataStore2.getSharedObject<SharedString>(stringId);
-		await waitForContainerConnection(container2);
-		string2.insertText(0, "how are you");
-
-		const waitForSummary2 = async (container) => {
-			await new Promise<void>((resolve, reject) => {
-				let summarized = false;
-				container.on("op", (op) => {
-					if (op.type === "summarize") {
-						summarized = true;
-					} else if (summarized && op.type === "summaryAck") {
-						resolve();
-					} else if (op.type === "summaryNack") {
-						reject(new Error("summaryNack"));
-					}
-				});
-			});
-		};
-		// We will wait for a new summary to make sure next time we stashed a container
-		// we get a new snapshot.
-		await waitForSummary2(container2);
+	
+	it("refresh after several ops ", async function () {
+		// this should refresh container1 base snapshot without stashing
+		for(let i=0; i<50; i++){
+			string1.insertText(0, "AAA");
+			string1.insertText(0, "BBB");
+		}
+		await waitForSummary();
 		await provider.ensureSynchronized();
 
-		const container2StateString = await container2.closeAndGetPendingLocalState?.();
-		assert(container2StateString);
-		const container2State = JSON.parse(container2StateString);
+		const containerStateString2 = await container1.closeAndGetPendingLocalState?.();
+		assert(containerStateString2);
+		const containerState2 = JSON.parse(containerStateString2);
 		const baseSnapshotAttributesId2 =
-			container2State.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
+			containerState2.baseSnapshot.trees[".protocol"]?.blobs?.attributes;
 		const baseSnapshotAttibutes2 = JSON.parse(
-			container2State.snapshotBlobs[baseSnapshotAttributesId2],
+			containerState2.snapshotBlobs[baseSnapshotAttributesId2],
 		);
-		// when we refresh the base snapshot these new attributes will be different than original ones.
-		assert.strictEqual(baseSnapshotAttibutes2.minimumSequenceNumber, 0);
-		assert.strictEqual(baseSnapshotAttibutes2.sequenceNumber, 0);
+		assert(baseSnapshotAttibutes2.sequenceNumber !== 0,"base snapshot is the same as when we load");
+		assert.strictEqual(
+			baseSnapshotAttibutes2.sequenceNumber,
+			containerState2.savedOps[0].sequenceNumber - 1,
+		);
 	});
 
 	it("can make changes offline and resubmit them", async function () {
