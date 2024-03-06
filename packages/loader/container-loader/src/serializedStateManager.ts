@@ -37,6 +37,13 @@ export class SerializedStateManager {
 		  }
 		| undefined;
 	private readonly mc: MonitoringContext;
+	private snapshotSequenceNumber: number = 0;
+	private latestSnapshot:
+		| {
+				tree: ISnapshotTree;
+				blobs: ISerializableBlobContents;
+		  }
+		| undefined;
 
 	constructor(
 		private readonly pendingLocalState: IPendingContainerState | undefined,
@@ -63,7 +70,10 @@ export class SerializedStateManager {
 
 	public addProcessedOp(message: ISequencedDocumentMessage) {
 		if (this.offlineLoadEnabled) {
-			this.processedOps.push(message);
+			if (message.sequenceNumber > this.snapshotSequenceNumber) {
+				this.snapshot = this.latestSnapshot ?? this.snapshot;
+				this.processedOps.push(message);
+			}
 		}
 	}
 
@@ -76,27 +86,64 @@ export class SerializedStateManager {
 		specifiedVersion: string | undefined,
 		supportGetSnapshotApi: boolean | undefined,
 	) {
-		const { snapshot, version } =
-			this.pendingLocalState === undefined
-				? await this.fetchSnapshotCore(specifiedVersion, supportGetSnapshotApi)
-				: { snapshot: this.pendingLocalState.baseSnapshot, version: undefined };
-		const snapshotTree: ISnapshotTree | undefined = isInstanceOfISnapshot(snapshot)
-			? snapshot.snapshotTree
-			: snapshot;
-		if (this.pendingLocalState) {
-			this.snapshot = {
-				tree: this.pendingLocalState.baseSnapshot,
-				blobs: this.pendingLocalState.snapshotBlobs,
-			};
-		} else {
-			assert(snapshotTree !== undefined, "Snapshot should exist");
-			// non-interactive clients will not have any pending state we want to save
-			if (this.offlineLoadEnabled) {
-				const blobs = await getBlobContentsFromTree(snapshotTree, this.storageAdapter);
-				this.snapshot = { tree: snapshotTree, blobs };
-			}
-		}
-		return { snapshotTree, version };
+		let loadSnapshot: ISnapshotTree;
+		let loadVersion: IVersion | undefined;
+		return this.fetchSnapshotCore(specifiedVersion, supportGetSnapshotApi)
+			.then(async ({ snapshot: latest, version: latestVersion }) => {
+				const latestSnapshotTree: ISnapshotTree | undefined = isInstanceOfISnapshot(latest)
+					? latest.snapshotTree
+					: latest;
+
+				if (this.pendingLocalState) {
+					this.snapshot = {
+						tree: this.pendingLocalState.baseSnapshot,
+						blobs: this.pendingLocalState.snapshotBlobs,
+					};
+					loadSnapshot = this.pendingLocalState.baseSnapshot;
+					loadVersion = undefined;
+					assert(latestSnapshotTree !== undefined, "Snapshot should exist");
+					if (this.offlineLoadEnabled) {
+						const blobs = await getBlobContentsFromTree(
+							latestSnapshotTree,
+							this.storageAdapter,
+						);
+						this.latestSnapshot = { tree: latestSnapshotTree, blobs };
+						const attributes: IDocumentAttributes = await this.getDocumentAttributes(
+							this.storageAdapter,
+							this.latestSnapshot.tree,
+						);
+						this.snapshotSequenceNumber = attributes.sequenceNumber;
+					}
+				} else {
+					assert(latestSnapshotTree !== undefined, "Snapshot should exist");
+					if (this.offlineLoadEnabled) {
+						const blobs = await getBlobContentsFromTree(
+							latestSnapshotTree,
+							this.storageAdapter,
+						);
+						this.snapshot = { tree: latestSnapshotTree, blobs };
+					}
+					loadSnapshot = latestSnapshotTree;
+					loadVersion = latestVersion;
+				}
+
+				return { snapshotTree: loadSnapshot, version: loadVersion };
+			})
+			.catch(async (error) => {
+				if (this.pendingLocalState) {
+					this.snapshot = {
+						tree: this.pendingLocalState.baseSnapshot,
+						blobs: this.pendingLocalState.snapshotBlobs,
+					};
+					const attributes: IDocumentAttributes = await this.getDocumentAttributes(
+						this.storageAdapter,
+						this.pendingLocalState.baseSnapshot,
+					);
+					this.snapshotSequenceNumber = attributes.sequenceNumber;
+				}
+				console.log("FAILURREE: ", error);
+				return { snapshotTree: this.pendingLocalState?.baseSnapshot, version: undefined };
+			});
 	}
 
 	private async fetchSnapshotCore(
@@ -153,50 +200,6 @@ export class SerializedStateManager {
 		return { snapshot, version };
 	}
 
-	public refreshAttributes(supportGetSnapshotApi: boolean | undefined) {
-		this.fetchSnapshotCore(undefined, supportGetSnapshotApi)
-			.then(async ({ snapshot }) => {
-				const snapshotTree: ISnapshotTree | undefined = isInstanceOfISnapshot(snapshot)
-					? snapshot.snapshotTree
-					: snapshot;
-				assert(snapshotTree !== undefined, "Snapshot should exist");
-				const blobs = await getBlobContentsFromTree(snapshotTree, this.storageAdapter);
-
-				const attributes: IDocumentAttributes = await this.getDocumentAttributes(
-					this.storageAdapter,
-					snapshotTree,
-				);
-				const snapshotSN = attributes.sequenceNumber;
-				const firstSavedOpSN = this.processedOps[0].sequenceNumber;
-				const lastSavedOpSN =
-					this.processedOps[this.processedOps.length - 1].sequenceNumber;
-
-				if (snapshotSN < firstSavedOpSN - 1) {
-					throw new Error("Fetched snapshot is not latest available");
-				} else if (snapshotSN < firstSavedOpSN) {
-					// snapshotSN === firstSavedOpSN - 1:
-					// Snapshot is exactly one less than the first processed op sequence number.
-					// Meaning new snapshot is the same as before refreshing. Do nothing.
-					// Add telemetry here to check we tried to update the snapshot but got the same one.
-					return;
-				} else if (snapshotSN >= firstSavedOpSN && snapshotSN <= lastSavedOpSN) {
-					// Snapshot is between the first and last saved operation.
-					this.processedOps.splice(0, snapshotSN - firstSavedOpSN + 1);
-					this.snapshot = { tree: snapshotTree, blobs };
-				} else if (snapshotSN > lastSavedOpSN) {
-					// Snapshot is newer than the newest processed op.
-					// We need to wait and catch up with the operations to reach the snapshot's state.
-					throw new Error(
-						"Snapshot is newer than the newest saved operation. Synchronization might be needed.",
-					);
-				} else {
-					assert(!true, "Impossible case");
-				}
-			})
-			.catch((error) => {
-				console.log("FAILUREEEEEEEEEE: ", error);
-			});
-	}
 	/**
 	 * This method is only meant to be used by Container.attach() to set the initial
 	 * base snapshot when attaching.
