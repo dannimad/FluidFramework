@@ -185,7 +185,8 @@ export class SerializedStateManager {
 				snapshotSequenceNumber - firstProcessedOpSequenceNumber + 1,
 			);
 			this.snapshot = this.latestSnapshot;
-			this.sessionExpiryTimerStarted = Date.now();
+			this.sessionExpiryTimerStarted =
+				this.processedOps.length === 0 ? Date.now() : this.processedOps[0].timestamp;
 			this.latestSnapshot = undefined;
 			this.mc.logger.sendTelemetryEvent({
 				eventName: "SnapshotRefreshed",
