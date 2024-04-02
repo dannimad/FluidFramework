@@ -1255,12 +1255,10 @@ use_old_InterfaceDeclaration_OpAttributionKey(
     get_current_InterfaceDeclaration_OpAttributionKey());
 
 /*
- * Validate forward compatibility by using the old type in place of the current type.
- * If this test starts failing, it indicates a change that is not forward compatible.
- * To acknowledge the breaking change, add the following to package.json under
- * typeValidation.broken:
- * "TypeAliasDeclaration_SummarizeInternalFn": {"forwardCompat": false}
- */
+* Validate forward compat by using old type in place of current type
+* If breaking change required, add in package.json under typeValidation.broken:
+* "TypeAliasDeclaration_SummarizeInternalFn": {"forwardCompat": false}
+*/
 declare function get_old_TypeAliasDeclaration_SummarizeInternalFn():
     TypeOnly<old.SummarizeInternalFn>;
 declare function use_current_TypeAliasDeclaration_SummarizeInternalFn(
