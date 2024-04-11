@@ -362,14 +362,13 @@ export async function getLatestSnapshotInfo(
 				supportGetSnapshotApi,
 				undefined,
 			);
-			const snapshotFetchedTime = Date.now();
 			const snapshotBlobs = await getBlobContentsFromTree(baseSnapshot, storageAdapter);
 			const attributes: IDocumentAttributes = await getDocumentAttributes(
 				storageAdapter,
 				baseSnapshot,
 			);
 			const snapshotSequenceNumber = attributes.sequenceNumber;
-			return { baseSnapshot, snapshotBlobs, snapshotSequenceNumber, snapshotFetchedTime };
+			return { baseSnapshot, snapshotBlobs, snapshotSequenceNumber };
 		},
 	).catch(() => undefined);
 }
