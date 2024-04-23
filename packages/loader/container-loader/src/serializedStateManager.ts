@@ -134,9 +134,6 @@ export class SerializedStateManager {
 	public addProcessedOp(message: ISequencedDocumentMessage) {
 		if (this.offlineLoadEnabled) {
 			this.processedOps.push(message);
-			if (message.sequenceNumber === this.lastSavedOpSequenceNumber) {
-				this.allSavedOpsProcessed = true;
-			}
 			this.updateSnapshotAndProcessedOpsMaybe();
 		}
 	}
