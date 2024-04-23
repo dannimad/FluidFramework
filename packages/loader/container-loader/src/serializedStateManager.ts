@@ -248,7 +248,6 @@ export class SerializedStateManager {
 				snapshotSequenceNumber - firstProcessedOpSequenceNumber + 1,
 			);
 			this.snapshot = this.latestSnapshot;
-			this.snapshotFetchedTime = this.latestSnapshotFetchedTime;
 			this.latestSnapshot = undefined;
 			this.mc.logger.sendTelemetryEvent({
 				eventName: "SnapshotRefreshed",
@@ -366,13 +365,14 @@ export async function getLatestSnapshotInfo(
 				supportGetSnapshotApi,
 				undefined,
 			);
+			const snapshotFetchedTime = Date.now();
 			const snapshotBlobs = await getBlobContentsFromTree(baseSnapshot, storageAdapter);
 			const attributes: IDocumentAttributes = await getDocumentAttributes(
 				storageAdapter,
 				baseSnapshot,
 			);
 			const snapshotSequenceNumber = attributes.sequenceNumber;
-			return { baseSnapshot, snapshotBlobs, snapshotSequenceNumber };
+			return { baseSnapshot, snapshotBlobs, snapshotSequenceNumber, snapshotFetchedTime };
 		},
 	).catch(() => undefined);
 }
