@@ -101,6 +101,7 @@ export class SerializedStateManager {
 	private latestSnapshot: ISnapshotInfo | undefined;
 	private refreshSnapshot: Promise<void> | undefined;
 	private readonly lastSavedOpSequenceNumber: number = 0;
+	private supportGetSnapshotApi: boolean | undefined;
 
 	constructor(
 		private readonly pendingLocalState: IPendingContainerState | undefined,
@@ -120,7 +121,7 @@ export class SerializedStateManager {
 			this.lastSavedOpSequenceNumber =
 				pendingLocalState.savedOps[savedOpsSize - 1].sequenceNumber;
 		}
-		containerEvent.once("saved", () => this.updateSnapshotAndProcessedOpsMaybe());
+		containerEvent.on("saved", () => this.updateSnapshotAndProcessedOpsMaybe());
 	}
 
 	public get offlineLoadEnabled(): boolean {
@@ -134,6 +135,15 @@ export class SerializedStateManager {
 	public addProcessedOp(message: ISequencedDocumentMessage) {
 		if (this.offlineLoadEnabled) {
 			this.processedOps.push(message);
+			if (this.processedOps.length > 10 && this.latestSnapshot === undefined) {
+				this.refreshSnapshot??= (async () => {
+					assert(
+						this.supportGetSnapshotApi !== undefined,
+						"supportGetSnapshotApi should already be declared",
+					);
+					await this.refreshLatestSnapshot(this.supportGetSnapshotApi);
+				})();
+			}
 			this.updateSnapshotAndProcessedOpsMaybe();
 		}
 	}
@@ -142,6 +152,7 @@ export class SerializedStateManager {
 		specifiedVersion: string | undefined,
 		supportGetSnapshotApi: boolean,
 	) {
+		this.supportGetSnapshotApi = supportGetSnapshotApi;
 		if (this.pendingLocalState === undefined) {
 			const { baseSnapshot, version } = await getSnapshotTree(
 				this.mc,
@@ -237,6 +248,7 @@ export class SerializedStateManager {
 				stashedSnapshotSequenceNumber: this.snapshot?.snapshotSequenceNumber,
 			});
 			this.latestSnapshot = undefined;
+			this.refreshSnapshot = undefined;
 		} else if (snapshotSequenceNumber <= lastProcessedOpSequenceNumber) {
 			// Snapshot seq num is between the first and last processed op.
 			// Remove the ops that are already part of the snapshot
@@ -246,6 +258,7 @@ export class SerializedStateManager {
 			);
 			this.snapshot = this.latestSnapshot;
 			this.latestSnapshot = undefined;
+			this.refreshSnapshot = undefined;
 			this.mc.logger.sendTelemetryEvent({
 				eventName: "SnapshotRefreshed",
 				snapshotSequenceNumber,
@@ -263,7 +276,11 @@ export class SerializedStateManager {
 	 * base snapshot when attaching.
 	 * @param snapshot - snapshot and blobs collected while attaching
 	 */
-	public setInitialSnapshot(snapshot: SnapshotWithBlobs | undefined) {
+	public setInitialSnapshot(
+		snapshot: SnapshotWithBlobs | undefined,
+		supportGetSnapshotApi: boolean,
+	) {
+		this.supportGetSnapshotApi = supportGetSnapshotApi;
 		if (this.offlineLoadEnabled) {
 			assert(
 				this.snapshot === undefined,

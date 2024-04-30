@@ -1311,7 +1311,14 @@ export class Container
 						});
 					}
 					const snapshotWithBlobs = await attachP;
-					this.serializedStateManager.setInitialSnapshot(snapshotWithBlobs);
+					const supportGetSnapshotApi: boolean =
+						this.mc.config.getBoolean(
+							"Fluid.Container.UseLoadingGroupIdForSnapshotFetch",
+						) === true && this.service?.policies?.supportGetSnapshotApi === true;
+					this.serializedStateManager.setInitialSnapshot(
+						snapshotWithBlobs,
+						supportGetSnapshotApi,
+					);
 					if (!this.closed) {
 						this.handleDeltaConnectionArg(attachProps?.deltaConnection, {
 							fetchOpsFromStorage: false,

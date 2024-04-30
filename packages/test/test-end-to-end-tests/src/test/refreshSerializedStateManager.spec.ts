@@ -143,6 +143,73 @@ describeCompat("Snapshot refresh at loading", "NoCompat", (getTestObjectProvider
 		assert.strictEqual(map2.get(testKey), testValue);
 	});
 
+	it("snapshot was refreshed after some ops", async () => {
+		const provider = getTestObjectProvider();
+		const getLatestSnapshotInfoP = new Deferred<void>();
+		const testContainerConfig = {
+			fluidDataObjectType: DataObjectFactoryType.Test,
+			registry,
+			runtimeOptions,
+			loaderProps: {
+				logger: wrapObjectAndOverride<ITelemetryBaseLogger>(mockLogger, {
+					send: (tb) => (event) => {
+						tb.send(event);
+						if (
+							event.eventName ===
+							"fluid:telemetry:serializedStateManager:SnapshotRefreshed"
+						) {
+							assert(
+								event.snapshotSequenceNumber ?? 0 > 0,
+								"snapshot was not refreshed",
+							);
+							assert(
+								event.newFirstProcessedOpSequenceNumber ?? 0 > 1,
+								"processed ops were not refreshed",
+							);
+							getLatestSnapshotInfoP.resolve();
+						}
+					},
+				}),
+				configProvider: configProvider({
+					"Fluid.Container.enableOfflineLoad": true,
+					"Fluid.ContainerRuntime.CompressionChunkingDisabled": true,
+				}),
+			},
+		};
+		const loader = provider.makeTestLoader(testContainerConfig);
+		const container: IContainerExperimental = await createAndAttachContainer(
+			provider.defaultCodeDetails,
+			loader,
+			provider.driver.createCreateNewRequest(createDocumentId()),
+		);
+
+		const url = await container.getAbsoluteUrl("");
+		assert(url, "no url");
+		await waitForContainerConnection(container);
+		const dataStore = (await container.getEntryPoint()) as ITestFluidObject;
+		const map = await dataStore.getSharedObject<ISharedMap>(mapId);
+		for (let i = 0; i < 12; i++) {
+			map.set(`${i}`, i);
+			await provider.ensureSynchronized();
+		}
+		await provider.ensureSynchronized();
+		await getLatestSnapshotInfoP.promise;
+		const pendingOps = await container.closeAndGetPendingLocalState?.();
+		assert.ok(pendingOps);
+
+		const container1: IContainerExperimental = await loader.resolve({ url }, pendingOps);
+
+		const pendingOps2 = await container1.closeAndGetPendingLocalState?.();
+		const container2: IContainerExperimental = await loader.resolve({ url }, pendingOps2);
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+		const map2 = await dataStore2.getSharedObject<ISharedMap>(mapId);
+		await waitForContainerConnection(container2, true);
+		await provider.ensureSynchronized();
+		for (let i = 0; i < 12; i++) {
+			assert.strictEqual(map2.get(`${i}`), i);
+		}
+	});
+
 	it("snapshot was not refreshed", async () => {
 		const provider = getTestObjectProvider();
 		const getLatestSnapshotInfoP = new Deferred<void>();
