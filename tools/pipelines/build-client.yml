@@ -162,6 +162,7 @@ pr:
     - tools/markdown-magic/*
     - tools/pipelines/build-client.yml
     - tools/pipelines/templates/build-npm-package.yml
+    - tools/pipelines/templates/build-npm-package-test.yml
     - tools/pipelines/templates/include-policy-check.yml
     - tools/pipelines/templates/include-set-package-version.yml
     - tools/pipelines/templates/include-vars.yml
@@ -178,7 +179,7 @@ variables:
       buildNumberInPatch: ''
 
 extends:
-  template: /tools/pipelines/templates/build-npm-package.yml@self
+  template: /tools/pipelines/templates/build-npm-package-test.yml@self
   parameters:
     publish: ${{ variables.publish }}
     publishOverride: ${{ parameters.publishOverride }}
