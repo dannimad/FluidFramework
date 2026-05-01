@@ -29,6 +29,13 @@ export class DuplicateBatchDetector {
 	private readonly batchIdsBySeqNum = new Map<number, string>();
 
 	/**
+	 * High-water mark of {@link batchIdsBySeqNum}.size since the last summary, used to
+	 * surface peak memory pressure that the size at summary time alone would miss
+	 * (the map drains as MSN advances).
+	 */
+	private peakBatchCountSinceLastSummary = 0;
+
+	/**
 	 * Initialize from snapshot data if provided - otherwise initialize empty
 	 */
 	constructor(batchIdsFromSnapshot: [number, string][] | undefined) {
@@ -38,6 +45,7 @@ export class DuplicateBatchDetector {
 				this.seqNumByBatchId.set(batchId, seqNum);
 			}
 		}
+		this.peakBatchCountSinceLastSummary = this.batchIdsBySeqNum.size;
 	}
 
 	/**
@@ -81,6 +89,10 @@ export class DuplicateBatchDetector {
 		this.batchIdsBySeqNum.set(sequenceNumber, batchId);
 		this.seqNumByBatchId.set(batchId, sequenceNumber);
 
+		if (this.batchIdsBySeqNum.size > this.peakBatchCountSinceLastSummary) {
+			this.peakBatchCountSinceLastSummary = this.batchIdsBySeqNum.size;
+		}
+
 		return { duplicate: false };
 	}
 
@@ -108,15 +120,17 @@ export class DuplicateBatchDetector {
 	public getRecentBatchInfoForSummary(
 		telemetryContext?: ITelemetryContext,
 	): [number, string][] | undefined {
-		if (this.batchIdsBySeqNum.size === 0) {
+		const currentCount = this.batchIdsBySeqNum.size;
+		const peakCount = this.peakBatchCountSinceLastSummary;
+		// Always log peak so we don't lose the high-water mark when the map has drained
+		// to 0 by summary time. Reset peak to current so the next window measures fresh.
+		telemetryContext?.set("fluid_DuplicateBatchDetector_", "recentBatchCount", currentCount);
+		telemetryContext?.set("fluid_DuplicateBatchDetector_", "peakBatchCount", peakCount);
+		this.peakBatchCountSinceLastSummary = currentCount;
+
+		if (currentCount === 0) {
 			return undefined;
 		}
-
-		telemetryContext?.set(
-			"fluid_DuplicateBatchDetector_",
-			"recentBatchCount",
-			this.batchIdsBySeqNum.size,
-		);
 
 		return [...this.batchIdsBySeqNum.entries()];
 	}

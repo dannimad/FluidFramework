@@ -1449,7 +1449,7 @@ export class ContainerRuntime
 	private readonly _flushMode: FlushMode;
 	private readonly stagingModeAutoFlushThreshold: number;
 	/**
-	 * Kill switch for {@link ContainerRuntime.duplicateBatchDetector} auto-activation.
+	 * Kill switch for {@link ContainerRuntime.duplicateBatchDetector}.
 	 * When true, the detector is never constructed and resubmits omit batchIds.
 	 */
 	private readonly duplicateBatchDetectionDisabled: boolean;
@@ -1517,34 +1517,15 @@ export class ContainerRuntime
 	 * serialized pending state and submit batches with the same batchId.
 	 *
 	 * @remarks
-	 * Activates automatically (sticky once on) once we have any signal that fork
-	 * detection is in play in this session:
-	 *
-	 * - rehydrated from a captured pending state at construction (`pendingLocalState`),
-	 * - loaded from a snapshot whose `recentBatchInfo` blob is non-empty,
-	 * - `getPendingLocalState()` is called (the moment we capture pending state),
-	 * - or an inbound batch arrives carrying an explicit `batchId` in its metadata,
-	 * which means some peer has activated stamping, so this runtime — even as a
-	 * pure observer — needs to be tracking too in order to stay consistent.
+	 * On by default. When the detector is constructed, this runtime also stamps
+	 * `batchId` on resubmitted batches so peers can detect forks; presence of the
+	 * detector is the single source of truth for both inbound observation and
+	 * outbound stamping.
 	 *
 	 * Can be force-disabled via the `Fluid.ContainerRuntime.DisableDuplicateBatchDetection`
 	 * config (see {@link ContainerRuntime.duplicateBatchDetectionDisabled}).
 	 */
-	private duplicateBatchDetector: DuplicateBatchDetector | undefined;
-
-	/**
-	 * Whether this runtime should stamp `batchId` on resubmitted batches so peers
-	 * can detect forked-container collisions.
-	 *
-	 * @remarks
-	 * Conceptually orthogonal to {@link ContainerRuntime.duplicateBatchDetector}
-	 * (one is about inbound observation, the other about outbound stamping), but
-	 * we currently use a single all-or-nothing switch: stamping is on iff the
-	 * detector is active.
-	 */
-	private get enableBatchIdTracking(): boolean {
-		return this.duplicateBatchDetector !== undefined;
-	}
+	private readonly duplicateBatchDetector: DuplicateBatchDetector | undefined;
 	private readonly outbox: Outbox;
 	private readonly garbageCollector: IGarbageCollector;
 
@@ -1917,18 +1898,10 @@ export class ContainerRuntime
 			this.mc.config.getBoolean("Fluid.ContainerRuntime.DisableDuplicateBatchDetection") ===
 			true;
 
-		// Activate the duplicate batch detector when this runtime is involved in the
-		// pending-state lifecycle: rehydrated from a captured pending state, or loading
-		// a snapshot that already tracks recent batches. Otherwise, lazily activate when
-		// getPendingLocalState() is called (see ensureDuplicateBatchDetector). Activation
-		// is sticky once on for the runtime's lifetime.
-		const loadedWithPendingState = pendingLocalState !== undefined;
-		const loadedWithRecentBatchInfo =
-			recentBatchInfo !== undefined && recentBatchInfo.length > 0;
-		if (
-			!this.duplicateBatchDetectionDisabled &&
-			(loadedWithPendingState || loadedWithRecentBatchInfo)
-		) {
+		// On by default. Construction is unconditional except when force-disabled via the
+		// kill switch above. The detector is also the gate for outbound batchId stamping
+		// on resubmit (see reSubmitBatch).
+		if (!this.duplicateBatchDetectionDisabled) {
 			this.duplicateBatchDetector = new DuplicateBatchDetector(recentBatchInfo);
 		}
 
@@ -2730,7 +2703,13 @@ export class ContainerRuntime
 		const recentBatchInfo =
 			this.duplicateBatchDetector?.getRecentBatchInfoForSummary(telemetryContext);
 		if (recentBatchInfo !== undefined) {
-			addBlobToSummary(summaryTree, recentBatchInfoBlobName, JSON.stringify(recentBatchInfo));
+			const serialized = JSON.stringify(recentBatchInfo);
+			telemetryContext?.set(
+				"fluid_DuplicateBatchDetector_",
+				"recentBatchInfoBytes",
+				serialized.length,
+			);
+			addBlobToSummary(summaryTree, recentBatchInfoBlobName, serialized);
 		}
 
 		const dataStoreAliases = this.channelCollection.aliases;
@@ -3150,12 +3129,6 @@ export class ContainerRuntime
 
 			if ("batchStart" in inboundResult) {
 				const batchStart: BatchStartInfo = inboundResult.batchStart;
-				// An explicit batchId means some peer has activated stamping, so we
-				// must track too — even as a pure observer — to stay consistent with
-				// peers that will throw on the duplicate.
-				if (batchStart.batchId !== undefined) {
-					this.ensureDuplicateBatchDetector();
-				}
 				const result = this.duplicateBatchDetector?.processInboundBatch(batchStart);
 				if (result?.duplicate === true) {
 					const error = new DataCorruptionError(
@@ -5002,11 +4975,10 @@ export class ContainerRuntime
 		);
 
 		const resubmitInfo = {
-			// Stamp batchId on resubmits whenever fork-detection is in play in this
-			// session. Detector-on and stamping-on are conceptually distinct concerns
-			// (inbound observation vs. outbound cooperation), but currently share a
-			// single all-or-nothing switch (see {@link enableBatchIdTracking}).
-			batchId: this.enableBatchIdTracking ? batchId : undefined,
+			// Stamp batchId on resubmits whenever the detector is active. Omitting it
+			// when the kill switch suppresses the detector keeps wire format unchanged
+			// for that path.
+			batchId: this.duplicateBatchDetector === undefined ? undefined : batchId,
 			staged,
 		};
 
@@ -5298,17 +5270,6 @@ export class ContainerRuntime
 		this.disposeFn();
 	}
 
-	/**
-	 * Lazily activates the duplicate batch detector. Used at the moment we capture
-	 * pending state via {@link ContainerRuntime.getPendingLocalState}, since a forked
-	 * container could resubmit any pending batches we are about to serialize.
-	 */
-	private ensureDuplicateBatchDetector(): void {
-		if (!this.duplicateBatchDetectionDisabled && this.duplicateBatchDetector === undefined) {
-			this.duplicateBatchDetector = new DuplicateBatchDetector(undefined);
-		}
-	}
-
 	public getPendingLocalState(props?: IGetPendingLocalStateProps): unknown {
 		// AB#46464 - Add support for serializing pending state while in staging mode
 		if (this.inStagingMode) {
@@ -5329,10 +5290,6 @@ export class ContainerRuntime
 		if (this._flushMode !== FlushMode.TurnBased) {
 			throw new UsageError("getPendingLocalState requires FlushMode.TurnBased");
 		}
-
-		// The act of capturing pending state means a forked container could resubmit
-		// the same batches, so we must track batch IDs from this point forward.
-		this.ensureDuplicateBatchDetector();
 
 		// Flush pending batch.
 		// getPendingLocalState() is only exposed through Container.getPendingLocalState(), so it's safe

@@ -2368,7 +2368,7 @@ describe("Runtime", () => {
 				batchId: string,
 			): void => processBatch(containerRuntime, sequenceNumber, batchId);
 
-			it("Does NOT activate when inbound batches lack an explicit batchId", async () => {
+			it("Detects duplicate batch with explicit batchId", async () => {
 				const { runtime: containerRuntime } = await ContainerRuntime.loadRuntime2({
 					context: getMockContext() as IContainerContext,
 					registry: new FluidDataStoreRegistry([]),
@@ -2377,70 +2377,13 @@ describe("Runtime", () => {
 					provideEntryPoint: mockProvideEntryPoint,
 				});
 
-				// Inbound batches without explicit batchId must not flip activation on,
-				// otherwise plain (non-forked) sessions would unnecessarily start tracking.
-				processBatch(containerRuntime, 123, undefined);
-				assert.doesNotThrow(
-					() => processBatch(containerRuntime, 234, undefined),
-					"Detector should remain off when no explicit batchId is observed",
-				);
-			});
-
-			it("Activates on inbound batch carrying an explicit batchId", async () => {
-				const { runtime: containerRuntime } = await ContainerRuntime.loadRuntime2({
-					context: getMockContext() as IContainerContext,
-					registry: new FluidDataStoreRegistry([]),
-					existing: false,
-					runtimeOptions: { enableRuntimeIdCompressor: "on" },
-					provideEntryPoint: mockProvideEntryPoint,
-				});
-
-				// First explicit-batchId observation activates the detector; a duplicate
-				// arriving afterwards should be caught.
+				// Detector is on by default. A duplicate batchId in the same session
+				// should be caught even in a vanilla load (no pending state, no priors).
 				processBatchWithId(containerRuntime, 123, "batchId1");
 				assert.throws(
 					() => processBatchWithId(containerRuntime, 234, "batchId1"),
 					errorPredicate,
-					"Detector should activate after seeing an explicit batchId",
-				);
-			});
-
-			it("Activates when constructor receives pendingLocalState", async () => {
-				const { runtime: containerRuntime } = await ContainerRuntime.loadRuntime2({
-					context: getMockContext({
-						pendingLocalState: {},
-					}) as IContainerContext,
-					registry: new FluidDataStoreRegistry([]),
-					existing: false,
-					runtimeOptions: { enableRuntimeIdCompressor: "on" },
-					provideEntryPoint: mockProvideEntryPoint,
-				});
-
-				processBatchWithId(containerRuntime, 123, "batchId1");
-				assert.throws(
-					() => processBatchWithId(containerRuntime, 234, "batchId1"),
-					errorPredicate,
-					"Detector should activate when loaded with pendingLocalState",
-				);
-			});
-
-			it("Activates after getPendingLocalState() is called", async () => {
-				const { runtime: containerRuntime } = await ContainerRuntime.loadRuntime2({
-					context: getMockContext() as IContainerContext,
-					registry: new FluidDataStoreRegistry([]),
-					existing: false,
-					runtimeOptions: { enableRuntimeIdCompressor: "on" },
-					provideEntryPoint: mockProvideEntryPoint,
-				});
-
-				// Trigger lazy activation by capturing pending state
-				containerRuntime.getPendingLocalState();
-
-				processBatchWithId(containerRuntime, 123, "batchId1");
-				assert.throws(
-					() => processBatchWithId(containerRuntime, 234, "batchId1"),
-					errorPredicate,
-					"Detector should activate after getPendingLocalState() call",
+					"Duplicate batchId should be detected",
 				);
 			});
 
@@ -2467,7 +2410,7 @@ describe("Runtime", () => {
 
 			it("Constructor with pendingLocalState in non-TurnBased mode no longer throws", async () => {
 				// Regression: this used to be a constructor-time UsageError under the old flag gate.
-				// Detection still activates, but the FlushMode check has moved to capture time.
+				// The FlushMode check has moved to capture time (getPendingLocalState).
 				await assert.doesNotReject(
 					ContainerRuntime.loadRuntime2({
 						context: getMockContext({
@@ -2484,7 +2427,7 @@ describe("Runtime", () => {
 				);
 			});
 
-			it("Kill switch disables auto-activation", async () => {
+			it("Kill switch disables detection", async () => {
 				const { runtime: containerRuntime } = await ContainerRuntime.loadRuntime2({
 					context: getMockContext({
 						settings: {
@@ -2498,21 +2441,18 @@ describe("Runtime", () => {
 					provideEntryPoint: mockProvideEntryPoint,
 				});
 
-				// Even with pendingLocalState, getPendingLocalState(), and explicit
-				// batchIds on inbound batches, the detector stays off.
-				containerRuntime.getPendingLocalState();
+				// With the kill switch on, even an explicit duplicate batchId is not flagged.
 				processBatchWithId(containerRuntime, 123, "batchId1");
 				assert.doesNotThrow(
 					() => processBatchWithId(containerRuntime, 234, "batchId1"),
-					"Kill switch should suppress activation in all paths",
+					"Kill switch should suppress detection",
 				);
 			});
 
 			// Note: batchId stamping on resubmits in both detector states is also verified
 			// by the "Replaying ops should resend in correct order" test in the Batching block.
 
-			it("Activates when snapshot contains recentBatchInfo, and roundtrips through summary", async () => {
-				// Writer: activates via getPendingLocalState(), then we summarize to extract the blob.
+			it("recentBatchInfo roundtrips through summary and detects duplicates on reload", async () => {
 				const { runtime: containerRuntime } = await ContainerRuntime.loadRuntime2({
 					context: getMockContext() as IContainerContext,
 					registry: new FluidDataStoreRegistry([]),
@@ -2520,7 +2460,6 @@ describe("Runtime", () => {
 					runtimeOptions: { enableRuntimeIdCompressor: "on" },
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				containerRuntime.getPendingLocalState();
 
 				// Add batchId1 to DuplicateBatchDetector via ContainerRuntime.process,
 				// and get its serialized representation from summarizing
